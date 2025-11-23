@@ -1,0 +1,355 @@
+# MTXT Specification (Working Draft)
+
+> **⚠️ Work in Progress**  
+> This specification is under active development and subject to change. A reference implementation is currently being developed.
+
+## Purpose
+MTXT is a human-editable, text-based representation of music information.  
+It aims to simplify the process of writing, reading, and editing musical data without requiring specialized binary tools.  
+The format is designed to be:
+- **Human friendly**: Use of musical note names (C4, D#3, etc.), readable times, and intuitive syntax.  
+- **LLM compatible**: Simple, consistent text format that can be easily generated and manipulated by language models.  
+- **Real-time ready**: Supports streaming musical events and real-time data transfer with transitions and flexible timing.  
+- **Editable**: One event per line, easy to search and modify with any text editor.  
+- **Hand-writable**: Efficient syntax with aliases for custom note names and chords, making hand-crafted files practical and expressive.  
+- **Infinitely customizable**: Aliases enable endless possibilities for personalized musical vocabularies and shortcuts.  
+- **Microtonal support**: Built-in cents notation for notes (e.g., `C4+50`, `D4-25`) and global tuning commands for alternate tuning systems and just intonation.  
+- **Future-proof**: Supports unlimited channels (0-65535), arbitrary CC parameters with custom string keys, float-based values for extensibility, and smooth transitions for expressive parameter changes.  
+
+## Design Considerations
+- **Easy manipulation**: Format prioritizes straightforward human and LLM editing of musical data over parsing complexity.  
+- **Beat-based timing**: Events are placed on fractional beats using simple decimal notation (e.g., `3.5`).  
+- **Flexible organization**: Events can be written in any order in the file, with the parser handling chronological sorting.  
+- **Expressive aliases**: Define custom note names and chord shortcuts that can be redefined at any point in the file.  
+- **Smooth transitions**: Built-in support for gliding continuous parameters (CC, tempo) with customizable curves and timing.  
+- **Metadata first-class**: Metadata is integrated as events for extensibility and compatibility.  
+- **One event per line**: Keeps files clean, easy to diff, version control, and searchable.  
+
+
+## Quick Example
+```
+version 1.0.0
+
+meta title Hello World
+
+0.0 meta key C major
+0.0 tempo 120
+0.0 timesig 4/4
+
+ch=0 // set default channel to 0
+0.0 note C4 dur=1.0            // default vel=0.8, ch=0
+dur=1.5 // set default note duration to 1.5 beats
+vel=0.8 // set default velocity to 0.8
+0.5 note D4 vel=0.9  // override default velocity with 0.9
+1.0 cc volume 0.8
+1.5 note E4 // uses default duration and velocity
+```
+
+## Versioning
+
+- First line must declare version:
+  ```
+  version 1.0.0
+  ```
+
+## Comments
+
+- Lines beginning with `//` are comments.
+- Inline comments are also allowed:
+  ```
+  12.5 note C4 dur=1.0 vel=0.8 // this is middle C
+  ```
+
+## Structure
+
+- A file consists of:
+  1. Version line
+  2. Global metadata (optional)
+  3. Events (can be in any timestamp order)
+
+## Transitions
+
+Use transitions to glide a continuous parameter to a target value by a specific beat, with a chosen feel.
+
+- Supported on: `cc`, `tempo`.
+- Fields:
+  - `transition_curve=<alpha>` controls the feel of the glide:
+    - `0.0` (linear): steady change from start to finish (default)
+    - `> 0` (gentle start → speeds up): musical "ease-in", swells late.
+    - `< 0` (fast start → settles): musical "ease-out", arrives smoothly.
+  - `transition_time=<duration>` (`τ`) is the glide length in beats. Default `0.0` (instant jump). The change begins at `T − τ` and reaches the target at command time `T`.
+  - `transition_interval=<duration>` is the minimum time between each value update in milliseconds. Default `1.0` (as fast as possible).
+
+Examples:
+- `0.0 cc pitch 0.0` — pitch is `0.0` at `0.0`.
+- `1.0 cc pitch 0.5 transition_time=0.2` — pitch glides to `0.5` value between beats `0.8` and `1.0`.
+- `5.0 cc pitch 0.95 transition_curve=0.5 transition_time=1.5` — starts at `3.5`, accelerates toward `0.95` near `5.0`.
+- `7.0 cc volume 0.2 transition_curve=-0.4 transition_time=2.0` — begins at `5.0`, moves quickly then coasts into `0.2` at `2.0`.
+
+Curve definition:
+- `value(t) = V0 + (V1 − V0) * ( s + max(α,0) * (s^4 − s) − max(−α,0) * ((1 − (1 − s)^4) − s) )`
+- `s = (t − (T − τ)) / τ`; if `τ = 0`, the change is instant at `T`.
+
+Notes:
+- Each transition needs a defined value before its end time `T` to establish the start (`V0` at `T − τ`). If no prior value exists, this is an error.
+- Overlapping transitions on the same parameter/channel: the new transition immediately aborts the previous at the current value and takes over. When segments conflict, the one with the higher end beat (`T`) has precedence.
+- Implementations may render transitions as dense discrete MIDI events.
+
+## Commands
+
+### version
+```
+version <semver>
+```
+- Declares the file format version. Must be the first non-comment line.
+
+### meta
+```
+meta <type> <value>
+```
+- Adds metadata (e.g., `title`, `author`, `copyright`, `trackname`, custom types).
+- Value extends from the type to the end of the line (or until inline comment).
+- Does not affect playback; carried into MIDI meta events where applicable.
+
+#### Standard Meta Types
+
+| Type         | Description      | Example                              |
+| ------------ | ---------------- | ------------------------------------ |
+| `title`      | Song title       | `meta title My Song`               |
+| `author`     | Composer/author  | `meta author John Doe`             |
+| `copyright`  | Copyright notice | `meta copyright © 2024 Music Corp` |
+| `composer`   | Composer name    | `meta composer John Doe`           |
+| `trackname`  | Track name       | `meta trackname Lead Guitar`       |
+| `instrument` | Instrument name  | `meta instrument Steinway Grand`   |
+| `text`       | General text     | `meta text Verse 1`                |
+| `lyric`      | Lyrics           | `meta lyric Hello world`           |
+| `marker`     | Marker/cue point | `meta marker Chorus`               |
+| `cue`        | Cue point        | `meta cue Solo begins`             |
+| `program`    | Program name     | `meta program Piano Ballad`        |
+| `device`     | Device name      | `meta device OpenPiano 1000`       |
+| `key`        | Key signature    | `meta key C major`                 |
+| `ch1`        | Channel 1's name | `meta ch1 Piano`                   |
+| `date`       | Creation date    | `meta date 2024-01-01`             |
+| `genre`      | Musical genre    | `meta genre Rock`                  |
+| `album`      | Album name       | `meta album Greatest Hits`         |
+| `url`        | Related URL      | `meta url https://example.com`     |
+| `artist`     | Performer name   | `meta artist The Band`             |
+| `license`    | Usage license    | `meta license CC-BY-4.0`           |
+| `generator`  | Software tool    | `meta generator MySequencer v1.0`  |
+
+
+### ch (channel directive)
+```
+ch=<0..65535>
+```
+- Sets the default MIDI channel for subsequent events.
+- Inline `ch=<N>` on events overrides the default for that event only.
+- Required before channel-dependent events that omit inline `ch`.
+
+### alias (note naming)
+```
+alias <name> <value>
+```
+- Defines a named alias for a note pitch or a chord.
+- `<name>`: Alphanumeric identifier (e.g., `snare`, `Cmaj7`).
+- `<value>`: Target note(s), comma-separated if multiple.
+- No timestamp. Applies to all subsequent events in the file until overridden.
+- Example:
+  ```
+  alias snare C2
+  alias Cmaj7 C4,E4,G4,B4  // chord alias
+  0.0 note snare
+  1.0 note Cmaj7          // plays all 4 notes
+  ```
+
+### vel (default note-on velocity)
+```
+vel=<0.0..1.0>
+```
+- Sets the default note-on velocity.
+- Inline `vel=<N>` on `note`/`on` overrides for that event.
+
+### offvel (default note-off velocity)
+```
+offvel=<0.0..1.0>
+```
+- Sets the default note-off velocity.
+- Inline `offvel=<N>` on `note`/`off` overrides for that event.
+- Defaults to `1.0` if not set.
+ 
+### dur (default note duration)
+```
+dur=<float>
+```
+- Sets the default note duration in beats.
+- Inline `dur=<N>` on `note` overrides for that event.
+- Defaults to `1.0` if not set.
+ 
+### transition settings
+```
+transition_curve=<float>
+transition_interval=<float>
+```
+- Sets default transition parameters for `cc` and `tempo`.
+- `transition_time` must be specified per event (default `0.0`).
+- See **Transitions** section for details.
+- Defaults: `curve=0.0`, `interval=1.0`.
+
+### note (shorthand)
+```
+<time> note <NOTE> [dur=<float>] [vel=<0..1>] [offvel=<0..1>] [ch=<0..65535>]
+```
+- Emits note-on at `<time>` and note-off at `<time + dur>`.
+- Uses defaults from `dur`, `vel`, `offvel`, and `ch` unless overridden.
+- `<time>` is absolute beat `BEAT.SUB` (0-based). Example: `3.5`.
+- `<NOTE>` can be a standard note name or an `alias`.
+- Standard names support `C..B` with `#`/`b`, octave required (e.g., `C4`).
+  - Allowed: `C, C#, Db, D, D#, Eb, E, F, F#, Gb, G, G#, Ab, A, A#, Bb, B`
+  - **Case insensitive**: Both uppercase and lowercase are accepted (`C4`, `c4`, `Bb2`, `bb2`, `F#3`, `f#3`)
+  - Double accidentals **not allowed**.
+  - Microtonal: `+N`/`-N` cents (range `-99..+99`), applied via pitch bend. Examples: `C4+50` (50 cents sharp), `D4-25` (25 cents flat), `bb2+10.5` (10.5 cents sharp). Positive values require `+`.
+
+### on (note-on)
+```
+<time> on <NOTE> [vel=<0..1>] [ch=<0..65535>]
+```
+- Emits a note-on only; useful for streaming.
+- Uses default `vel` and `ch` unless overridden.
+
+### off (note-off)
+```
+<time> off <NOTE> [offvel=<0..1>] [ch=<0..65535>]
+```
+- Emits a note-off only; useful for streaming.
+- Uses default `offvel` and `ch` unless overridden.
+
+### cc (control change)
+```
+<time> cc [note] <controller> <value> [ch=<0..65535>] [transition_curve=<float>] [transition_time=<float>] [transition_interval=<float>]
+```
+- Sends a control change. `<controller>` identifies the parameter.
+- `<value>` is `[0.0..1.0]`. Uses default `ch` unless overridden.
+- Uses global transition defaults unless overridden inline.
+- Optional `note` to apply CC to a specific note. In case note is specified, it applies to that note only.
+- When note is not specified, it applies to all notes within a channel. 
+- Arbitrary string keys can be used for custom parameters (e.g., `cc my_param 0.5`).
+
+#### Standard CC Names
+
+| Name                | Range         | Description                                                                      |
+| ------------------- | ------------- | -------------------------------------------------------------------------------- |
+| `pitch`             | `-12.0..12.0` | Pitch bend in semitones. 0=none, 1 = one semitone up, `-0.005` = half cent down  |
+| `aftertouch`        | `0.0..1.0`    | Channel or Polyphonic Aftertouch                                                 |
+| `vibrato`           | `0.0..1.0`    | Vibrato depth (Modulation Wheel)                                                 |
+| `vibrato_rate`      | `0.0..1024.0` | Vibrato rate in Hz                                                               |
+| `breath`            | `0.0..1.0`    | Breath controller pressure                                                       |
+| `foot`              | `0.0..1.0`    | Foot controller pedal position                                                   |
+| `portamento`        | `0.0..1.0`    | Portamento glide time                                                            |
+| `volume`            | `0.0..1.0`    | Channel volume level                                                             |
+| `balance`           | `-1.0..1.0`   | Stereo balance (left < 0, right > 0)                                             |
+| `pan`               | `-1.0..1.0`   | Stereo panning position (left < 0, right > 0)                                    |
+| `expression`        | `0.0..1.0`    | Expression (secondary volume, relative to main)                                  |
+| `sustain`           | `0.0..1.0`    | Sustain pedal (damper) on/off (> 0.5 is on)                                      |
+| `portamento_switch` | `0.0..1.0`    | Portamento on/off switch (> 0.5 is on)                                           |
+| `sostenuto`         | `0.0..1.0`    | Sostenuto pedal on/off (> 0.5 is on)                                             |
+| `soft`              | `0.0..1.0`    | Soft pedal (una corda) on/off (> 0.5 is on)                                      |
+| `legato`            | `0.0..1.0`    | Legato footswitch on/off (> 0.5 is on)                                           |
+| `sound_variation`   | `0.0..1.0`    | Sound variation                                                                  |
+| `timbre`            | `0.0..1.0`    | Timbre/harmonic intensity                                                        |
+| `resonance`         | `0.0..1.0`    | Resonance/Harmonic Content                                                       |
+| `attack`            | `0.0..1.0`    | Attack time                                                                      |
+| `decay`             | `0.0..1.0`    | Decay time                                                                       |
+| `hold`              | `0.0..1.0`    | Hold time                                                                        |
+| `sustain_level`     | `0.0..1.0`    | Sustain level (envelope)                                                         |
+| `release`           | `0.0..1.0`    | Release time                                                                     |
+| `cutoff`            | `0.0..1.0`    | Filter cutoff frequency (Brightness)                                             |
+| `reverb`            | `0.0..1.0`    | Reverb send level                                                                |
+| `tremolo`           | `0.0..1.0`    | Tremolo depth                                                                    |
+| `tremolo_rate`      | `0.0..1024.0` | Tremolo rate in Hz                                                               |
+| `chorus`            | `0.0..1.0`    | Chorus send level                                                                |
+| `detune`            | `0.0..1.0`    | Detune depth                                                                     |
+| `phaser`            | `0.0..1.0`    | Phaser depth                                                                     |
+| `distortion`        | `0.0..1.0`    | Distortion/Drive amount                                                          |
+| `compression`       | `0.0..1.0`    | Compression amount                                                               |
+| `local_control`     | `0.0..1.0`    | Local control on/off (> 0.5 is on)                                               |
+| `polyphony`         | `1.0..1024.0` | Polyphony count (rounded to int). 1=mono                                         |
+
+### voice (instrument selection)
+```
+<time> voice [ch=<0..65535>] <voice_list>
+```
+- Sets the instrument voice for the channel.
+- `<voice_list>` is a comma-separated list of voice names (e.g., `piano, acoustic piano, john's super piano`).
+- The synthesizer should use the **last** voice in the list that it supports.
+- It is advised to use a standard voice from `instruments.md` as the first item for compatibility.
+
+
+### tempo
+```
+<time> tempo <bpm> [transition_curve=<float>] [transition_time=<float>] [transition_interval=<float>]
+```
+- Sets tempo in BPM at `<time>`.
+- Uses global transition defaults unless overridden inline.
+
+### timesig
+```
+<time> timesig <NUM>/<DEN>
+```
+- Sets time signature; affects beat interpretation after `<time>`.
+
+
+### tuning
+```
+<time> tuning <target> <cents>
+```
+- Sets the global tuning offset for a note or pitch class.
+- `<target>` can be a pitch class (e.g., `C`, `F#`) or a specific note (e.g., `C4`).
+- `<cents>` is in range `[-100.0..+100.0]`. Positive values must use `+`.
+- Tuning is additive: `Final Pitch = Standard Pitch + Tuning + Note Offset`.
+- Changes are instantaneous (no interpolation).
+- Specific note tuning overrides pitch class tuning.
+- Example:
+  ```
+  0.0 tuning E -13.7   // Flatten all Es
+  0.0 tuning G +3.5    // Sharpen all Gs
+  0.0 tuning E4 0.0    // Exception: E4 is standard tuning (overrides previous line)
+  ```
+
+### reset
+```
+<time> reset [target]
+```
+- Resets state variables to defaults.
+- `<target>` options:
+  - `all` (default): All notes off, all controllers reset, tuning cleared on all channels.
+  - `ch=<N>`: Resets controllers and turns off notes on specific channel.
+  - `tuning`: Clears all global tuning definitions.
+- Example:
+  ```
+  10.0 reset all
+  12.0 reset ch=1
+  14.0 reset tuning
+  ```
+
+### sysex
+```
+<time> sysex <hex-bytes>
+```
+- Sends raw SysEx bytes (space-separated hex, including `F0`/`F7` as needed).
+- Example: `12.0 sysex F0 7E 7F 09 01 F7`
+
+### comments
+```
+// full-line comment
+ch=1  // inline comment
+```
+- Ignored by the parser; may appear on their own line or inline.
+
+---
+
+## License
+
+Copyright © 2025 Dani Biró
+
+Specification is licensed under the MIT License.
+
