@@ -120,6 +120,7 @@ The CLI supports various transforms that can be applied during conversion:
 
 - All times are in beats specified as fractional numbers. e.g. `3.25` means 3 beats and 1 quarter note.
 - This allows changing the tempo and time signature without affecting the timing of events.
+- Events may appear in any order in the file; the parser will sort them before playback
 - Precision is limited to 5 decimal places (5 microseconds at 120 BPM).
 
 ## Commands
