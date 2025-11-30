@@ -2,8 +2,8 @@
 name = "mtxt"
 version = "0.8.0"
 edition = "2024"
-authors = ["Dani Biro <danipro93@gmail.com>"]
-description = "MTXT Music information file format"
+authors = ["Dani Biró <danipro93@gmail.com>"]
+description = "MTXT Music Text Format"
 license = "MIT"
 repository = "https://github.com/Daninet/mtxt"
 readme = "README.md"

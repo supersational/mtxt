@@ -1,6 +1,5 @@
 # MTXT - Music Text Format
 
-## Purpose
 MTXT is a human-editable, text-based representation of music information.  
 It aims to simplify the process of writing, reading, and editing musical data without requiring specialized binary tools.  
 
@@ -64,8 +63,8 @@ vel=0.8
 
 This repository includes a reference implementation in Rust that provides:
 
-- **Library (`mid2mtxt`)**: Rust crate for parsing and writing MTXT files, with MIDI conversion features.
-- **CLI tool**: Command-line utility for converting between MIDI and MTXT formats with built-in transforms.
+- **Library (`mtxt`)**: Rust crate for parsing and writing MTXT files, with MIDI conversion features.
+- **CLI tool**: Command-line utility for converting between MIDI and MTXT formats with built-in transforms. Builds can be downloaded from [releases](https://github.com/Daninet/mtxt/releases).
 
 
 ### Basic Usage
