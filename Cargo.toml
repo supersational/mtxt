@@ -7,7 +7,7 @@ description = "MTXT Music Text Format"
 license = "MIT"
 repository = "https://github.com/Daninet/mtxt"
 readme = "README.md"
-keywords = ["mtxt", "music", "midi", "text", "format", "audio", "synth", "converter", "parser"]
+keywords = ["mtxt", "music", "midi", "text", "format"]
 categories = ["multimedia", "encoding", "parser-implementations", "command-line-utilities"]
 
 [lib]
