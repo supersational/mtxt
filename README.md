@@ -1,7 +1,8 @@
 # MTXT - Music Text Format
 
-MTXT is a human-editable, text-based representation of music information.  
-It aims to simplify the process of writing, reading, and editing musical data without requiring specialized binary tools.  
+MTXT is a human-editable, text-based format for representing musical performance data. It stores events with precise timing, pitch, and expression values in a simple line-based structure that's easy to edit without requiring specialized tools.
+
+The format is designed for cases where exact performance details matter - arbitrary timings, micro-tuning, dynamic changes, and other expressive parameters. MTXT avoids binary encoding, making it suitable for manual and AI-assisted editing.
 
 ## Features
 - **Beat-based**: Events are placed on fractional beats using simple decimal notation (e.g., in a 4/4 time signature, 1 beat = 1 quarter note, so 3.25 represents 3 quarter notes plus 1 sixteenth note).
