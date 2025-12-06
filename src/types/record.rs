@@ -35,7 +35,7 @@ impl fmt::Display for VoiceList {
         if self.voices.is_empty() {
             write!(f, "silence")?;
         } else {
-            write!(f, " {}", self.voices.join(", "))?;
+            write!(f, "{}", self.voices.join(", "))?;
         }
         Ok(())
     }

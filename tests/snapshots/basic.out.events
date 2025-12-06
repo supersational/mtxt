@@ -21,7 +21,7 @@
 [       0] Meta global generator MTXT Test
 [       0] Tempo bpm=120
 [       0] TimeSignature 4/4
-[       0] Voice ["piano", "acoustic grand"] ch=0
+[       0] Voice ch=0 piano, acoustic grand
 [       0] NoteOn C4 vel=0.8 ch=0
 [     500] Beat 1
 [     500] NoteOff C4 off_vel=0.5 ch=0
@@ -101,7 +101,7 @@
 [   12000] NoteOff C4 off_vel=0.5 ch=0
 [   12000] Meta ch=0 marker Chorus
 [   12500] Beat 25
-[   12500] Voice ["electric guitar", "guitar"] ch=3
+[   12500] Voice ch=3 electric guitar, guitar
 [   13000] Beat 26
 [   13000] Tempo bpm=140
 [   13429] Beat 27

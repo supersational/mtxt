@@ -220,13 +220,7 @@ impl fmt::Display for MtxtOutputRecord {
                 time,
                 voices,
                 channel,
-            } => write!(
-                f,
-                "{} Voice {:?} ch={}",
-                format_time(*time),
-                voices,
-                channel
-            ),
+            } => write!(f, "{} Voice ch={} {}", format_time(*time), channel, voices,),
             MtxtOutputRecord::Tempo { time, bpm } => {
                 write!(f, "{} Tempo bpm={}", format_time(*time), format_float(*bpm))
             }
