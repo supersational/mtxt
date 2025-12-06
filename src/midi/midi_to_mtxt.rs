@@ -1,5 +1,6 @@
 use crate::file::MtxtFile;
 use crate::midi::drums;
+use crate::transforms::{extract, merge};
 use crate::types::beat_time::BeatTime;
 use crate::types::note::NoteTarget;
 use crate::types::record::{MtxtRecord, VoiceList};
@@ -223,6 +224,9 @@ fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {
         time_a.cmp(&time_b)
     });
 
+    final_events = extract::transform(&final_events);
+    final_events = merge::transform(&final_events);
+
     mtxt_file.records.extend(final_events);
 
     Ok(mtxt_file)
@@ -245,7 +249,17 @@ fn convert_midi_message_to_record(
                 NoteTarget::Note(midi_key_to_note(key.as_int())?)
             };
 
-            let velocity = vel.as_int() as f32 / 127.0;
+            let int_vel = vel.as_int();
+            if int_vel == 0 {
+                return Ok(MtxtRecord::NoteOff {
+                    time: beat_time,
+                    note: note_target,
+                    off_velocity: Some(0.0),
+                    channel: Some(channel),
+                });
+            }
+
+            let velocity = int_vel as f32 / 127.0;
             return Ok(MtxtRecord::NoteOn {
                 time: beat_time,
                 note: note_target,
