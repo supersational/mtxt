@@ -148,19 +148,38 @@ fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {
         version: Version { major: 1, minor: 0 },
     });
 
-    // Add drum aliases
-    for drum in DRUMS.iter() {
-        if let Ok(note) = midi_key_to_note(drum.number.into()) {
-            mtxt_file.records.push(MtxtRecord::AliasDef {
-                value: Rc::new(AliasDefinition {
-                    name: drum.slug.to_string(),
-                    notes: vec![note],
-                }),
-            });
+    let all_events = get_midi_single_track_events(smf)?;
+
+    // Collect used drum aliases
+    let mut used_drum_aliases = std::collections::HashSet::new();
+    for event in &all_events {
+        match &event.record {
+            MtxtRecord::NoteOn {
+                note: NoteTarget::AliasKey(key),
+                ..
+            }
+            | MtxtRecord::NoteOff {
+                note: NoteTarget::AliasKey(key),
+                ..
+            } => {
+                used_drum_aliases.insert(key.clone());
+            }
+            _ => {}
         }
     }
 
-    let all_events = get_midi_single_track_events(smf)?;
+    for drum in DRUMS.iter() {
+        if used_drum_aliases.contains(drum.slug) {
+            if let Ok(note) = midi_key_to_note(drum.number.into()) {
+                mtxt_file.records.push(MtxtRecord::AliasDef {
+                    value: Rc::new(AliasDefinition {
+                        name: drum.slug.to_string(),
+                        notes: vec![note],
+                    }),
+                });
+            }
+        }
+    }
     let mut final_events: Vec<MtxtRecord> = Vec::new();
 
     for event in all_events {

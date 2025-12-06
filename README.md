@@ -46,8 +46,9 @@ vel=0.8
 
 // Play melody (uses default duration and velocity from above, unless overridden)
 0.0 note C4
-1.0 note E4 
 2.0 note G4 vel=0.5
+// Notes can be put in arbitrary order, the parser will sort them
+1.0 note E4 
 2.0 note G4 vel=0.5
 
 // Chords can also be played (defined above as an alias for C4,E4,G4,B4 notes)
