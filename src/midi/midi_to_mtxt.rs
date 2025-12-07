@@ -8,8 +8,6 @@ use crate::types::time_signature::TimeSignature;
 use crate::types::version::Version;
 use anyhow::{Result, bail};
 use midly::{Format, MetaMessage, MidiMessage, Smf, Timing, TrackEventKind};
-use std::fs;
-use std::path::PathBuf;
 
 use super::escape::escape_string;
 use super::shared::{midi_cc_to_name, midi_key_signature_to_string, midi_key_to_note};
@@ -23,33 +21,6 @@ use std::rc::Rc;
 struct MidiSingleTrackEvent {
     tick: BeatTime,
     record: MtxtRecord,
-}
-
-pub fn convert_midi_to_mtxt(path: &str, verbose: bool) -> Result<MtxtFile> {
-    let input_path = PathBuf::from(path);
-
-    if !input_path.exists() {
-        anyhow::bail!("Input file does not exist: {}", path);
-    }
-
-    if verbose {
-        println!("Reading MIDI file: {}", input_path.display());
-    }
-
-    let data = fs::read(&input_path)?;
-    let smf = Smf::parse(&data)?;
-
-    if verbose {
-        println!("Converting MIDI to MTXT...");
-    }
-
-    let mtxt_file = convert_smf_to_mtxt(&smf)?;
-
-    if verbose {
-        println!("Conversion complete: {} records", mtxt_file.records.len());
-    }
-
-    Ok(mtxt_file)
 }
 
 // It merges all events from all MIDI tracks into a single list of events
@@ -141,6 +112,11 @@ fn get_midi_single_track_events(smf: &Smf) -> Result<Vec<MidiSingleTrackEvent>> 
 
     all_events.sort_by_key(|event| event.tick);
     Ok(all_events)
+}
+
+pub fn convert_midi_to_mtxt(midi_bytes: &[u8]) -> Result<MtxtFile> {
+    let smf = Smf::parse(midi_bytes)?;
+    convert_smf_to_mtxt(&smf)
 }
 
 fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {

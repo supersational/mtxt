@@ -198,8 +198,9 @@ fn main() -> Result<()> {
                 if verbose {
                     println!("Reading MIDI file: {}", input_file);
                 }
-                midi::convert_midi_to_mtxt(input_file, verbose)
-                    .context("Failed to convert MIDI to MTXT")?
+                let midi_bytes = std::fs::read(input_file)
+                    .with_context(|| format!("Failed to read MIDI file: {}", input_file))?;
+                midi::convert_midi_to_mtxt(&midi_bytes).context("Failed to convert MIDI to MTXT")?
             }
             #[cfg(not(feature = "midi"))]
             {
@@ -229,8 +230,10 @@ fn main() -> Result<()> {
                 if verbose {
                     println!("Writing MIDI file: {}", output_file);
                 }
-                midi::convert_mtxt_to_midi(&mtxt_file, output_file, verbose)
+                let midi_bytes = midi::convert_mtxt_to_midi(&mtxt_file)
                     .context("Failed to convert MTXT to MIDI")?;
+                std::fs::write(output_file, midi_bytes)
+                    .with_context(|| format!("Failed to write MIDI file: {}", output_file))?;
             }
             #[cfg(not(feature = "midi"))]
             {
