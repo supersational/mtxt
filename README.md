@@ -96,6 +96,7 @@ The CLI supports various transforms that can be applied during conversion:
 - `--apply-directives` - Apply global directives to events (inline parameters)
 - `--extract-directives` - Extract common inline parameters into global directives
 - `--merge-notes` - Merge note on / off pairs into note shorthand events with durations
+- `--group-channels` - Group events by channel
 - `--sort` - Sort events by time
 - `--indent` - Enable timestamp padding
 
