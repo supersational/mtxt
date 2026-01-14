@@ -99,6 +99,56 @@ The CLI supports various transforms that can be applied during conversion:
 
 ---
 
+## Python Library
+
+Python bindings for MTXT built with PyO3.
+
+### Installation
+
+```bash
+pip install maturin
+maturin develop --features python,midi
+```
+
+### Usage
+
+```python
+import mtxt
+
+# Parse MTXT
+file = mtxt.parse("""mtxt 1.0
+0 tempo 120
+0 note C4 dur=1 vel=0.8
+""")
+
+# Access properties
+print(file.version)           # "1.0"
+print(file.duration)          # 0.0 (beats)
+print(file.get_meta("title")) # metadata
+
+# File I/O
+file = mtxt.load("song.mtxt")
+file.save("output.mtxt")
+
+# MIDI conversion
+file.to_midi("output.mid")
+file2 = mtxt.MtxtFile.from_midi("input.mid")
+```
+
+### Testing
+
+```bash
+# Run tests
+pytest tests/python/
+
+# Type checking
+mypy tests/python/test_types.py
+```
+
+See `PYTHON_BINDINGS.md` for full documentation.
+
+---
+
 ## MTXT Specification
 
 ## Versioning
