@@ -103,6 +103,52 @@ class MtxtFile:
         """
         ...
 
+    def to_midi_bytes(self, verbose: bool = False) -> bytes:
+        """
+        Convert this MTXT file to MIDI format as bytes.
+
+        Args:
+            verbose: Whether to print conversion progress
+
+        Returns:
+            MIDI file content as bytes
+
+        Raises:
+            ConversionError: If the conversion fails
+
+        Example:
+            >>> import mtxt
+            >>> file = mtxt.parse("mtxt 1.0\\n0 note C4 dur=1")
+            >>> midi_data = file.to_midi_bytes()
+            >>> len(midi_data)
+            84
+        """
+        ...
+
+    @staticmethod
+    def from_midi_bytes(data: bytes, verbose: bool = False) -> MtxtFile:
+        """
+        Parse MIDI format from bytes.
+
+        Args:
+            data: MIDI file content as bytes
+            verbose: Whether to print conversion progress
+
+        Returns:
+            The converted MTXT file
+
+        Raises:
+            ConversionError: If the MIDI data cannot be parsed
+
+        Example:
+            >>> import mtxt
+            >>> with open('song.mid', 'rb') as f:
+            ...     midi_data = f.read()
+            >>> file = mtxt.MtxtFile.from_midi_bytes(midi_data)
+            >>> file.save("song.mtxt")
+        """
+        ...
+
     def save(self, path: str) -> None:
         """
         Save this MTXT file to disk.
@@ -233,6 +279,29 @@ def midi_to_mtxt(midi_path: str, verbose: bool = False) -> MtxtFile:
     Example:
         >>> import mtxt
         >>> file = mtxt.midi_to_mtxt("song.mid")
+        >>> file.save("song.mtxt")
+    """
+    ...
+
+def from_midi_bytes(data: bytes, verbose: bool = False) -> MtxtFile:
+    """
+    Parse MIDI format from bytes (module-level convenience function).
+
+    Args:
+        data: MIDI file content as bytes
+        verbose: Whether to print conversion progress
+
+    Returns:
+        The converted MTXT file
+
+    Raises:
+        ConversionError: If the MIDI data cannot be parsed
+
+    Example:
+        >>> import mtxt
+        >>> import requests
+        >>> midi_data = requests.get("https://upload.wikimedia.org/wikipedia/commons/5/55/MIDI_sample.mid", headers = {'User-Agent': 'Mozilla/5.0'}).content
+        >>> file = mtxt.from_midi_bytes(midi_data)
         >>> file.save("song.mtxt")
     """
     ...

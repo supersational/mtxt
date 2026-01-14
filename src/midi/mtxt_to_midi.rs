@@ -39,6 +39,33 @@ pub fn convert_mtxt_to_midi(mtxt_file: &MtxtFile, output: &str, verbose: bool) -
     Ok(())
 }
 
+pub fn convert_mtxt_to_midi_bytes(mtxt_file: &MtxtFile, verbose: bool) -> Result<Vec<u8>> {
+    if verbose {
+        println!("Converting to MIDI...");
+    }
+
+    let mut output_records = mtxt_file.get_output_records();
+
+    if verbose {
+        println!("Processing {} output records", output_records.len());
+    }
+
+    let smf = convert_output_records_to_midi(&mut output_records)?;
+
+    if verbose {
+        println!("Writing MIDI to bytes...");
+    }
+
+    let mut buffer = Vec::new();
+    smf.write(&mut buffer).map_err(|e| anyhow::anyhow!("Failed to write MIDI: {}", e))?;
+
+    if verbose {
+        println!("Conversion completed successfully! ({} bytes)", buffer.len());
+    }
+
+    Ok(buffer)
+}
+
 fn voice_to_program_change(voice: &VoiceList) -> u8 {
     for voice in voice.voices.iter().rev() {
         let voice_lower = voice.to_lowercase();

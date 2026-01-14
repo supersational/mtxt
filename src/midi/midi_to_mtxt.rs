@@ -37,7 +37,28 @@ pub fn convert_midi_to_mtxt(path: &str, verbose: bool) -> Result<MtxtFile> {
     }
 
     let data = fs::read(&input_path)?;
-    let smf = Smf::parse(&data)?;
+
+    // Reuse bytes implementation to avoid duplication
+    // (bytes function is silent, we print here for file-based API)
+    if verbose {
+        println!("Converting MIDI to MTXT...");
+    }
+
+    let mtxt_file = convert_midi_bytes_to_mtxt(&data, false)?;
+
+    if verbose {
+        println!("Conversion complete: {} records", mtxt_file.records.len());
+    }
+
+    Ok(mtxt_file)
+}
+
+pub fn convert_midi_bytes_to_mtxt(data: &[u8], verbose: bool) -> Result<MtxtFile> {
+    if verbose {
+        println!("Parsing MIDI from bytes ({} bytes)...", data.len());
+    }
+
+    let smf = Smf::parse(data)?;
 
     if verbose {
         println!("Converting MIDI to MTXT...");
