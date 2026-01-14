@@ -6,7 +6,7 @@ build-backend = "maturin"
 name = "mtxt"
 version = "0.8.1"
 description = "MTXT Music Text Format - Python bindings"
-authors = [{name = "Dani Biró", email = "danipro93@gmail.com"}]
+authors = [{name = "Dani Biró", email = "danipro93@gmail.com"}, {name = "Sven Hollowell"}]
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
