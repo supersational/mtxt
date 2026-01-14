@@ -14,6 +14,7 @@ import sys
 import os
 import tempfile
 from pathlib import Path
+import pytest
 
 
 def find_test_files():
@@ -21,29 +22,26 @@ def find_test_files():
     test_dir = Path(__file__).parent.parent / "snapshots"
 
     if not test_dir.exists():
-        print(f"⚠ Test directory not found: {test_dir}")
         return []
 
-    mtxt_files = list(test_dir.glob("*.in.mtxt"))
-    print(f"Found {len(mtxt_files)} test files:")
-    for f in mtxt_files:
-        print(f"  - {f.name}")
+    return list(test_dir.glob("*.in.mtxt"))
 
-    return mtxt_files
+
+@pytest.fixture(scope="module", params=find_test_files(), ids=lambda p: p.name if hasattr(p, 'name') else str(p))
+def test_file(request):
+    """Fixture providing test files"""
+    return request.param
 
 
 def test_parse_roundtrip(test_file):
     """Test MTXT -> Parse -> Serialize -> Parse roundtrip"""
     import mtxt
 
-    print(f"\nTest: Parse roundtrip for {test_file.name}")
-
     # Read original file
     original_content = test_file.read_text()
 
     # First parse
     file1 = mtxt.parse(original_content)
-    print(f"  ✓ Parsed original: {len(file1)} records")
 
     # Serialize back to string
     serialized = str(file1)
@@ -51,74 +49,42 @@ def test_parse_roundtrip(test_file):
     # Try to parse again
     try:
         file2 = mtxt.parse(serialized)
-        print(f"  ✓ Re-parsed: {len(file2)} records")
 
         # Compare metadata
         meta1 = dict(file1.metadata)
         meta2 = dict(file2.metadata)
 
-        if meta1 != meta2:
-            print(f"  ⚠ Metadata differs:")
-            print(f"    Original: {meta1}")
-            print(f"    After roundtrip: {meta2}")
-            return False
+        assert meta1 == meta2, f"Metadata differs: {meta1} != {meta2}"
 
         # Compare basic properties
         assert file1.version == file2.version, f"Version mismatch: {file1.version} != {file2.version}"
         assert file1.duration == file2.duration, f"Duration mismatch: {file1.duration} != {file2.duration}"
 
-        # The record count might differ slightly due to directive normalization,
-        # but should be close
+        # The record count might differ slightly due to directive normalization
         record_diff = abs(len(file1) - len(file2))
-        if record_diff > len(file1) * 0.1:  # Allow 10% difference
-            print(f"  ⚠ Record count differs significantly: {len(file1)} vs {len(file2)}")
-            return False
-
-        print(f"  ✓ Parse roundtrip successful")
-        print(f"    Version: {file1.version}")
-        print(f"    Duration: {file1.duration} beats")
-        print(f"    Metadata: {len(meta1)} entries")
-
-        return True
+        assert record_diff <= len(file1) * 0.1, f"Record count differs significantly: {len(file1)} vs {len(file2)}"
 
     except mtxt.ParseError as e:
         # Known issue: alias serialization doesn't add commas between notes
         # This is a limitation in the Rust Display implementation, not the Python bindings
         if "alias" in str(e).lower() or "invalid digit" in str(e).lower():
-            print(f"  ⚠ Re-parse failed (known serialization limitation): {e}")
-            print(f"    Note: Alias definitions may not roundtrip perfectly")
-            print(f"    But data integrity is maintained:")
-            print(f"      - Version: {file1.version}")
-            print(f"      - Duration: {file1.duration} beats")
-            print(f"      - Records: {len(file1)}")
-            # Save for debugging
-            with open("/tmp/failed_roundtrip.mtxt", "w") as f:
-                f.write(serialized)
-            print(f"    - Serialized output saved to /tmp/failed_roundtrip.mtxt")
-            return True  # Don't fail the test for known limitation
+            pytest.skip(f"Known serialization limitation with aliases: {e}")
         else:
             raise
 
 
-def test_midi_roundtrip(test_file):
+def test_midi_roundtrip(test_file, has_midi):
     """Test MTXT -> MIDI -> MTXT roundtrip"""
-    import mtxt
+    if not has_midi:
+        pytest.skip("MIDI support not available")
 
-    print(f"\nTest: MIDI roundtrip for {test_file.name}")
+    import mtxt
 
     # Read original file
     original_content = test_file.read_text()
     file1 = mtxt.parse(original_content)
 
-    original_version = file1.version
     original_duration = file1.duration
-    original_metadata = dict(file1.metadata)
-
-    print(f"  Original:")
-    print(f"    Version: {original_version}")
-    print(f"    Duration: {original_duration} beats")
-    print(f"    Records: {len(file1)}")
-    print(f"    Metadata: {len(original_metadata)} entries")
 
     # Convert to MIDI
     with tempfile.NamedTemporaryFile(suffix='.mid', delete=False) as f:
@@ -126,34 +92,16 @@ def test_midi_roundtrip(test_file):
 
     try:
         file1.to_midi(midi_path)
-        midi_size = os.path.getsize(midi_path)
-        print(f"  ✓ Converted to MIDI: {midi_size} bytes")
 
         # Convert back to MTXT
         file2 = mtxt.MtxtFile.from_midi(midi_path)
-        print(f"  ✓ Converted back to MTXT: {len(file2)} records")
-
-        # Check basic properties
-        print(f"  After roundtrip:")
-        print(f"    Version: {file2.version}")
-        print(f"    Duration: {file2.duration} beats")
-        print(f"    Records: {len(file2)}")
-        print(f"    Metadata: {len(dict(file2.metadata))} entries")
 
         # Duration should be approximately preserved
-        # (MIDI tick resolution and event processing might cause differences)
         if original_duration is not None and file2.duration is not None:
             duration_diff = abs(original_duration - file2.duration)
             duration_tolerance = max(5.0, original_duration * 0.15)  # 15% or 5 beats
-            if duration_diff > duration_tolerance:
-                print(f"  ⚠ Duration differs significantly: {original_duration} -> {file2.duration}")
-                print(f"    (Difference: {duration_diff:.2f} beats, tolerance: {duration_tolerance:.2f})")
-                return False
-            elif duration_diff > 1.0:
-                print(f"  ✓ Duration approximately preserved ({duration_diff:.2f} beat difference)")
-
-        print(f"  ✓ MIDI roundtrip successful")
-        return True
+            assert duration_diff <= duration_tolerance, \
+                f"Duration differs too much: {original_duration} -> {file2.duration} (diff: {duration_diff:.2f}, tolerance: {duration_tolerance:.2f})"
 
     finally:
         if os.path.exists(midi_path):
@@ -164,15 +112,8 @@ def test_file_io_roundtrip(test_file):
     """Test File Read -> Save -> Read roundtrip"""
     import mtxt
 
-    print(f"\nTest: File I/O roundtrip for {test_file.name}")
-
     # Load from file
     file1 = mtxt.load(str(test_file))
-    print(f"  ✓ Loaded from file: {len(file1)} records")
-
-    original_version = file1.version
-    original_duration = file1.duration
-    original_records = len(file1)
 
     # Save to temp file
     with tempfile.NamedTemporaryFile(mode='w', suffix='.mtxt', delete=False) as f:
@@ -180,50 +121,35 @@ def test_file_io_roundtrip(test_file):
 
     try:
         file1.save(temp_path)
-        file_size = os.path.getsize(temp_path)
-        print(f"  ✓ Saved to temp file: {file_size} bytes")
 
         # Load again
         try:
             file2 = mtxt.load(temp_path)
-            print(f"  ✓ Reloaded from temp file: {len(file2)} records")
 
             # Compare
-            assert file1.version == file2.version, f"Version mismatch"
-            assert file1.duration == file2.duration, f"Duration mismatch"
-            assert len(file1) == len(file2), f"Record count mismatch"
+            assert file1.version == file2.version, "Version mismatch"
+            assert file1.duration == file2.duration, "Duration mismatch"
+            assert len(file1) == len(file2), "Record count mismatch"
 
             meta1 = dict(file1.metadata)
             meta2 = dict(file2.metadata)
-            assert meta1 == meta2, f"Metadata mismatch"
-
-            print(f"  ✓ File I/O roundtrip successful")
-            print(f"    All properties preserved")
-            return True
+            assert meta1 == meta2, "Metadata mismatch"
 
         except mtxt.ParseError as e:
             # Known serialization limitation with aliases
             if "alias" in str(e).lower() or "invalid digit" in str(e).lower():
-                print(f"  ⚠ Reload failed (known serialization limitation): {e}")
-                print(f"    Note: This is a Rust serialization issue, not Python bindings")
-                print(f"    Original file was successfully:")
-                print(f"      - Loaded: {original_records} records")
-                print(f"      - Saved: {file_size} bytes")
-                print(f"    Saved file location: {temp_path}")
-                return True  # Don't fail for known limitation
+                pytest.skip(f"Known serialization limitation with aliases: {e}")
             else:
                 raise
 
     finally:
-        # Keep temp file for debugging if there was an issue
-        pass  # Don't delete so we can inspect
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
 
 
 def test_metadata_preservation():
     """Test that metadata is preserved through various operations"""
     import mtxt
-
-    print(f"\nTest: Metadata preservation")
 
     content = """mtxt 1.0
 meta global title "Test Song"
@@ -240,25 +166,17 @@ meta global composer "Test Composer"
     file1.set_metadata("year", '"2026"')
 
     metadata = dict(file1.metadata)
-    print(f"  Original metadata ({len(metadata)} entries):")
-    for key, value in metadata.items():
-        print(f"    {key}: {value}")
 
     # Serialize and re-parse
     serialized = str(file1)
     file2 = mtxt.parse(serialized)
 
     metadata2 = dict(file2.metadata)
-    print(f"  After parse roundtrip ({len(metadata2)} entries):")
-    for key, value in metadata2.items():
-        print(f"    {key}: {value}")
 
     # Check all metadata preserved
     for key, value in metadata.items():
         assert key in metadata2, f"Missing metadata key: {key}"
         assert metadata2[key] == value, f"Metadata value mismatch for {key}: {value} != {metadata2[key]}"
-
-    print(f"  ✓ All metadata preserved")
 
     # Test MIDI roundtrip with metadata
     with tempfile.NamedTemporaryFile(suffix='.mid', delete=False) as f:
@@ -268,50 +186,33 @@ meta global composer "Test Composer"
         file2.to_midi(midi_path)
         file3 = mtxt.MtxtFile.from_midi(midi_path)
 
-        metadata3 = dict(file3.metadata)
-        print(f"  After MIDI roundtrip ({len(metadata3)} entries):")
-        for key, value in metadata3.items():
-            print(f"    {key}: {value}")
-
-        # Note: MIDI format preserves some metadata (title, copyright, etc.)
-        # but not all custom metadata. Just check that we got something back.
-        print(f"  ✓ MIDI roundtrip completed (metadata partially preserved)")
+        # Note: MIDI format preserves some metadata but not all
+        # Just verify we got something back
+        assert len(file3.metadata) > 0, "MIDI should preserve some metadata"
 
     finally:
         if os.path.exists(midi_path):
             os.unlink(midi_path)
-
-    return True
 
 
 def test_empty_file_roundtrip():
     """Test roundtrip with minimal/empty files"""
     import mtxt
 
-    print(f"\nTest: Empty/minimal file roundtrip")
-
     # Minimal valid MTXT
     minimal = "mtxt 1.0\n"
 
     file1 = mtxt.parse(minimal)
-    print(f"  ✓ Parsed minimal file: {len(file1)} records")
-
     serialized = str(file1)
     file2 = mtxt.parse(serialized)
-    print(f"  ✓ Re-parsed: {len(file2)} records")
 
     assert file1.version == file2.version
     assert len(file1) == len(file2)
-
-    print(f"  ✓ Minimal file roundtrip successful")
-    return True
 
 
 def test_unicode_metadata_roundtrip():
     """Test that unicode in metadata is preserved"""
     import mtxt
-
-    print(f"\nTest: Unicode metadata roundtrip")
 
     content = """mtxt 1.0
 meta global title "测试歌曲 🎵"
@@ -327,11 +228,6 @@ meta global composer "Compositeur français"
     artist = file1.get_meta("artist")
     composer = file1.get_meta("composer")
 
-    print(f"  Original metadata:")
-    print(f"    title: {title}")
-    print(f"    artist: {artist}")
-    print(f"    composer: {composer}")
-
     # Roundtrip through serialization
     serialized = str(file1)
     file2 = mtxt.parse(serialized)
@@ -340,8 +236,6 @@ meta global composer "Compositeur français"
     assert file2.get_meta("title") == title
     assert file2.get_meta("artist") == artist
     assert file2.get_meta("composer") == composer
-
-    print(f"  ✓ Unicode preserved through parse roundtrip")
 
     # Save and load
     with tempfile.NamedTemporaryFile(mode='w', suffix='.mtxt', delete=False, encoding='utf-8') as f:
@@ -355,17 +249,14 @@ meta global composer "Compositeur français"
         assert file3.get_meta("artist") == artist
         assert file3.get_meta("composer") == composer
 
-        print(f"  ✓ Unicode preserved through file I/O")
-
     finally:
         if os.path.exists(temp_path):
             os.unlink(temp_path)
 
-    return True
 
-
+# Standalone script support
 def main():
-    """Run all roundtrip tests"""
+    """Run all roundtrip tests in standalone mode"""
     print("=" * 70)
     print("MTXT Roundtrip Test Suite")
     print("=" * 70)
@@ -379,13 +270,15 @@ def main():
         print("  maturin develop --features python,midi")
         return 1
 
-    # Check for MIDI support
+    # Find test files
+    test_files = find_test_files()
+    print(f"Found {len(test_files)} test files:")
+    for f in test_files:
+        print(f"  - {f.name}")
+
     has_midi = hasattr(mtxt, 'midi_to_mtxt')
     if not has_midi:
         print("⚠ MIDI support not available (midi feature not enabled)")
-
-    # Find test files
-    test_files = find_test_files()
 
     failed_tests = []
 
@@ -395,59 +288,59 @@ def main():
         print(f"Testing: {test_file.name}")
         print("=" * 70)
 
+        # Parse roundtrip
+        print(f"\n  Parse roundtrip...")
         try:
-            if not test_parse_roundtrip(test_file):
-                failed_tests.append(f"parse_roundtrip({test_file.name})")
+            test_parse_roundtrip(test_file)
+            print(f"  ✓ Pass")
+        except pytest.skip.Exception as e:
+            print(f"  ⚠ Skipped: {e}")
         except Exception as e:
-            print(f"  ✗ Parse roundtrip failed: {e}")
+            print(f"  ✗ Failed: {e}")
             failed_tests.append(f"parse_roundtrip({test_file.name})")
 
+        # File I/O roundtrip
+        print(f"\n  File I/O roundtrip...")
         try:
-            if not test_file_io_roundtrip(test_file):
-                failed_tests.append(f"file_io_roundtrip({test_file.name})")
+            test_file_io_roundtrip(test_file)
+            print(f"  ✓ Pass")
+        except pytest.skip.Exception as e:
+            print(f"  ⚠ Skipped: {e}")
         except Exception as e:
-            print(f"  ✗ File I/O roundtrip failed: {e}")
+            print(f"  ✗ Failed: {e}")
             failed_tests.append(f"file_io_roundtrip({test_file.name})")
 
+        # MIDI roundtrip
         if has_midi:
+            print(f"\n  MIDI roundtrip...")
             try:
-                if not test_midi_roundtrip(test_file):
-                    failed_tests.append(f"midi_roundtrip({test_file.name})")
+                test_midi_roundtrip(test_file, has_midi)
+                print(f"  ✓ Pass")
+            except pytest.skip.Exception as e:
+                print(f"  ⚠ Skipped: {e}")
             except Exception as e:
-                print(f"  ✗ MIDI roundtrip failed: {e}")
+                print(f"  ✗ Failed: {e}")
                 failed_tests.append(f"midi_roundtrip({test_file.name})")
-        else:
-            print("\n  ⊘ Skipping MIDI roundtrip (MIDI support not available)")
 
     # Run additional tests
     print("\n" + "=" * 70)
     print("Additional Roundtrip Tests")
     print("=" * 70)
 
-    try:
-        if not test_metadata_preservation():
-            failed_tests.append("metadata_preservation")
-    except Exception as e:
-        print(f"  ✗ Metadata preservation test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        failed_tests.append("metadata_preservation")
+    additional_tests = [
+        ("Metadata preservation", test_metadata_preservation),
+        ("Empty file roundtrip", test_empty_file_roundtrip),
+        ("Unicode metadata roundtrip", test_unicode_metadata_roundtrip),
+    ]
 
-    try:
-        if not test_empty_file_roundtrip():
-            failed_tests.append("empty_file_roundtrip")
-    except Exception as e:
-        print(f"  ✗ Empty file roundtrip test failed: {e}")
-        failed_tests.append("empty_file_roundtrip")
-
-    try:
-        if not test_unicode_metadata_roundtrip():
-            failed_tests.append("unicode_metadata_roundtrip")
-    except Exception as e:
-        print(f"  ✗ Unicode metadata roundtrip test failed: {e}")
-        import traceback
-        traceback.print_exc()
-        failed_tests.append("unicode_metadata_roundtrip")
+    for name, test_func in additional_tests:
+        print(f"\n  {name}...")
+        try:
+            test_func()
+            print(f"  ✓ Pass")
+        except Exception as e:
+            print(f"  ✗ Failed: {e}")
+            failed_tests.append(name)
 
     # Summary
     print("\n" + "=" * 70)
@@ -455,9 +348,9 @@ def main():
     print("=" * 70)
 
     total_files = len(test_files)
-    tests_per_file = 2 + (1 if has_midi else 0)  # parse, file_io, optionally midi
-    additional_tests = 3
-    total_tests = total_files * tests_per_file + additional_tests
+    tests_per_file = 2 + (1 if has_midi else 0)
+    additional_count = len(additional_tests)
+    total_tests = total_files * tests_per_file + additional_count
 
     if failed_tests:
         print(f"✗ {len(failed_tests)} test(s) failed out of {total_tests}:")
@@ -468,7 +361,7 @@ def main():
         print(f"✓ All {total_tests} roundtrip tests passed!")
         print(f"  - {total_files} test files")
         print(f"  - {tests_per_file} tests per file")
-        print(f"  - {additional_tests} additional tests")
+        print(f"  - {additional_count} additional tests")
         return 0
 
 
