@@ -28,8 +28,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/Daninet/mtxt"
-Repository = "https://github.com/Daninet/mtxt"
+Homepage = "https://github.com/supersational/mtxt/tree/python-lib"
+Repository = "https://github.com/supersational/mtxt/tree/python-lib"
 
 [tool.maturin]
 features = ["pyo3", "midi"]
