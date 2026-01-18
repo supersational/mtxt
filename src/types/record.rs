@@ -181,9 +181,12 @@ impl fmt::Display for MtxtRecord {
                 write!(f, "transition_interval={}", format_float32(*interval))
             }
             MtxtRecord::AliasDef { value } => {
-                write!(f, "alias {}", value.name)?;
-                for note in &value.notes {
-                    write!(f, " {}", note)?;
+                write!(f, "alias {} ", value.name)?;
+                for (i, note) in value.notes.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", note)?;
                 }
                 Ok(())
             }
