@@ -3,7 +3,7 @@ use crate::midi::drums;
 use crate::transforms::{extract, merge};
 use crate::types::beat_time::BeatTime;
 use crate::types::note::NoteTarget;
-use crate::types::record::{MtxtRecord, VoiceList};
+use crate::types::record::{MtxtRecord, MtxtRecordLine, VoiceList};
 use crate::types::time_signature::TimeSignature;
 use crate::types::version::Version;
 use anyhow::{Result, bail};
@@ -22,7 +22,7 @@ use std::rc::Rc;
 #[derive(Debug)]
 struct MidiSingleTrackEvent {
     tick: BeatTime,
-    record: MtxtRecord,
+    record: MtxtRecordLine,
 }
 
 pub fn convert_midi_to_mtxt(path: &str, verbose: bool) -> Result<MtxtFile> {
@@ -99,7 +99,7 @@ fn get_midi_single_track_events(smf: &Smf) -> Result<Vec<MidiSingleTrackEvent>> 
                     )?;
                     all_events.push(MidiSingleTrackEvent {
                         tick: beat_time,
-                        record,
+                        record: MtxtRecordLine::new(record),
                     });
                 }
                 TrackEventKind::Meta(meta_msg) => {
@@ -111,17 +111,17 @@ fn get_midi_single_track_events(smf: &Smf) -> Result<Vec<MidiSingleTrackEvent>> 
                     )? {
                         all_events.push(MidiSingleTrackEvent {
                             tick: beat_time,
-                            record,
+                            record: MtxtRecordLine::new(record),
                         });
                     }
                 }
                 TrackEventKind::SysEx(data) => {
                     all_events.push(MidiSingleTrackEvent {
                         tick: beat_time,
-                        record: MtxtRecord::SysEx {
+                        record: MtxtRecordLine::new(MtxtRecord::SysEx {
                             time: beat_time,
                             data: data.to_vec(),
-                        },
+                        }),
                     });
                 }
                 TrackEventKind::Escape(data) => {
@@ -130,9 +130,10 @@ fn get_midi_single_track_events(smf: &Smf) -> Result<Vec<MidiSingleTrackEvent>> 
 
                     all_events.push(MidiSingleTrackEvent {
                         tick: beat_time,
-                        record: MtxtRecord::Comment {
-                            text: format!("Escape sequence: {}", formatted.trim()),
-                        },
+                        record: MtxtRecordLine::with_comment(
+                            MtxtRecord::EmptyLine,
+                            format!("Escape sequence: {}", formatted.trim()),
+                        ),
                     });
                 }
             }
@@ -145,16 +146,18 @@ fn get_midi_single_track_events(smf: &Smf) -> Result<Vec<MidiSingleTrackEvent>> 
 
 fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {
     let mut mtxt_file = MtxtFile::new();
-    mtxt_file.records.push(MtxtRecord::Header {
-        version: Version { major: 1, minor: 0 },
-    });
+    mtxt_file
+        .records
+        .push(MtxtRecordLine::new(MtxtRecord::Header {
+            version: Version { major: 1, minor: 0 },
+        }));
 
     let all_events = get_midi_single_track_events(smf)?;
 
     // Collect used drum aliases
     let mut used_drum_aliases = std::collections::HashSet::new();
     for event in &all_events {
-        match &event.record {
+        match &event.record.record {
             MtxtRecord::NoteOn {
                 note: NoteTarget::AliasKey(key),
                 ..
@@ -172,24 +175,25 @@ fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {
     for drum in DRUMS.iter() {
         if used_drum_aliases.contains(drum.slug) {
             if let Ok(note) = midi_key_to_note(drum.number.into()) {
-                mtxt_file.records.push(MtxtRecord::AliasDef {
-                    value: Rc::new(AliasDefinition {
-                        name: drum.slug.to_string(),
-                        notes: vec![note],
-                    }),
-                });
+                mtxt_file
+                    .records
+                    .push(MtxtRecordLine::new(MtxtRecord::AliasDef {
+                        value: Rc::new(AliasDefinition {
+                            name: drum.slug.to_string(),
+                            notes: vec![note],
+                        }),
+                    }));
             }
         }
     }
-    let mut final_events: Vec<MtxtRecord> = Vec::new();
-
-    for event in all_events {
-        let record = event.record.clone();
-        final_events.push(record);
-    }
+    let mut final_events: Vec<MtxtRecordLine> =
+        all_events.into_iter().map(|event| event.record).collect();
 
     // Sort final events to ensure None/GlobalMeta come first
-    final_events.sort_by(|a, b| {
+    final_events.sort_by(|a_line, b_line| {
+        let a = &a_line.record;
+        let b = &b_line.record;
+
         // Helper to get sort key: (order_group, time)
         // order_group: 0=GlobalMeta, 1=Meta(None), 2=Other
         fn get_sort_key(record: &MtxtRecord) -> (u8, BeatTime) {
@@ -218,16 +222,15 @@ fn convert_smf_to_mtxt(smf: &Smf) -> Result<MtxtFile> {
             return group_a.cmp(&group_b);
         }
 
-        // Preserve original order for stable sort if times are equal
-        // But since this is an unstable sort, we rely on time.
-        // If times are equal, we might want to keep some deterministic order.
         time_a.cmp(&time_b)
     });
 
     final_events = extract::transform(&final_events);
     final_events = merge::transform(&final_events);
 
-    mtxt_file.records.extend(final_events);
+    for line in final_events {
+        mtxt_file.records.push(line);
+    }
 
     Ok(mtxt_file)
 }

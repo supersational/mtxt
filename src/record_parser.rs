@@ -1,3 +1,4 @@
+use crate::types::record::MtxtRecordLine;
 use crate::types::record::VoiceList;
 use crate::{
     BeatTime, MtxtRecord, Note, NoteTarget, TimeSignature, Version, types::record::AliasDefinition,
@@ -504,24 +505,50 @@ fn try_parse_time_event(parts: &[&str]) -> Result<Option<MtxtRecord>> {
     Ok(Some(res))
 }
 
-pub fn parse_mtxt_line(line: &str) -> Result<MtxtRecord, anyhow::Error> {
+// Detect inline comment if present (ignoring :// for URLs)
+fn find_inline_comment_index(line: &str) -> Option<usize> {
+    let mut search_start = 0;
+    while let Some(idx) = line[search_start..].find("//") {
+        let abs_idx = search_start + idx;
+        if abs_idx == 0 || !line[..abs_idx].ends_with(':') {
+            return Some(abs_idx);
+        }
+        search_start = abs_idx + 2;
+    }
+    None
+}
+
+pub fn parse_mtxt_line(line: &str) -> Result<MtxtRecordLine, anyhow::Error> {
     let line = line.trim();
 
     if line.is_empty() {
-        return Ok(MtxtRecord::EmptyLine);
+        return Ok(MtxtRecordLine::new(MtxtRecord::EmptyLine));
     }
 
+    // Full-line comments (line starts with //)
     if line.starts_with("//") {
-        let comment_text = line.strip_prefix("//").unwrap_or("").trim().to_string();
-        return Ok(MtxtRecord::Comment { text: comment_text });
+        let comment_text = line[2..].trim().to_string();
+        return Ok(MtxtRecordLine::with_comment(
+            MtxtRecord::EmptyLine,
+            comment_text,
+        ));
     }
+
+    // Inline comments
+    let (line, inline_comment) = if let Some(idx) = find_inline_comment_index(line) {
+        let content = line[..idx].trim();
+        let comment = line[idx + 2..].trim().to_string();
+        (content, Some(comment))
+    } else {
+        (line, None)
+    };
 
     let parts: Vec<&str> = line.split_ascii_whitespace().collect();
     if parts.is_empty() {
-        return Ok(MtxtRecord::EmptyLine);
+        return Ok(MtxtRecordLine::new(MtxtRecord::EmptyLine));
     }
 
-    match parts[0] {
+    let record = match parts[0] {
         "mtxt" => {
             if parts.len() != 2 {
                 bail!(
@@ -531,12 +558,10 @@ pub fn parse_mtxt_line(line: &str) -> Result<MtxtRecord, anyhow::Error> {
             }
             let version: Version = parts[1].parse().map_err(|e| anyhow::anyhow!("{}", e))?;
             version.fail_if_not_supported()?;
-            return Ok(MtxtRecord::Header { version });
+            MtxtRecord::Header { version }
         }
 
-        "meta" => {
-            return parse_meta_event(None, &parts[1..]);
-        }
+        "meta" => parse_meta_event(None, &parts[1..])?,
 
         "alias" => {
             if parts.len() < 3 {
@@ -559,23 +584,28 @@ pub fn parse_mtxt_line(line: &str) -> Result<MtxtRecord, anyhow::Error> {
                 name: name.clone(),
                 notes,
             });
-            return Ok(MtxtRecord::AliasDef { value: alias_def });
+            MtxtRecord::AliasDef { value: alias_def }
         }
-        _ => {}
+        _ => {
+            let parsed_directive = try_parse_global_directive(parts[0])?;
+            if let Some(record) = parsed_directive {
+                if parts.len() > 1 {
+                    bail!("Cannot parse global directive {}", parts.join(" "));
+                }
+                record
+            } else {
+                let parsed_time_event = try_parse_time_event(&parts)?;
+                if let Some(record) = parsed_time_event {
+                    record
+                } else {
+                    bail!("Cannot parse \"{}\"", parts.join(" "));
+                }
+            }
+        }
     };
 
-    let parsed_directive = try_parse_global_directive(parts[0])?;
-    if let Some(record) = parsed_directive {
-        if parts.len() > 1 {
-            bail!("Cannot parse global directive {}", parts.join(" "));
-        }
-        return Ok(record);
-    }
-
-    let parsed_time_event = try_parse_time_event(&parts)?;
-    if let Some(record) = parsed_time_event {
-        return Ok(record);
-    }
-
-    bail!("Cannot parse \"{}\"", parts.join(" "));
+    Ok(match inline_comment {
+        Some(comment) => MtxtRecordLine::with_comment(record, comment),
+        None => MtxtRecordLine::new(record),
+    })
 }

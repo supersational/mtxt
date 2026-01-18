@@ -24,6 +24,7 @@ pub use types::note::NoteTarget;
 pub use types::output_record::MtxtOutputRecord;
 pub use types::pitch::PitchClass;
 pub use types::record::MtxtRecord;
+pub use types::record::MtxtRecordLine;
 pub use types::time_signature::TimeSignature;
 pub use types::version::Version;
 

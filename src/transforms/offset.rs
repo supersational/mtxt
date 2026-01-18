@@ -1,7 +1,7 @@
 use crate::BeatTime;
-use crate::types::record::MtxtRecord;
+use crate::types::record::MtxtRecordLine;
 
-pub fn transform(records: &[MtxtRecord], offset: f32) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine], offset: f32) -> Vec<MtxtRecordLine> {
     if offset == 0.0 {
         return records.to_vec();
     }
@@ -14,19 +14,19 @@ pub fn transform(records: &[MtxtRecord], offset: f32) -> Vec<MtxtRecord> {
 
     records
         .iter()
-        .filter_map(|record| {
-            let mut new_record = record.clone();
-            if let Some(time) = new_record.time() {
+        .filter_map(|line| {
+            let mut new_line = line.clone();
+            if let Some(time) = new_line.record.time() {
                 if is_negative {
                     if time < offset_time {
                         return None;
                     }
-                    new_record.set_time(time - offset_time);
+                    new_line.record.set_time(time - offset_time);
                 } else {
-                    new_record.set_time(time + offset_time);
+                    new_line.record.set_time(time + offset_time);
                 }
             }
-            Some(new_record)
+            Some(new_line)
         })
         .collect()
 }

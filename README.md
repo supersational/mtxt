@@ -108,10 +108,6 @@ The CLI supports various transforms that can be applied during conversion:
   mtxt 1.0
   ```
 
-## Comments
-
-- Lines beginning with `//` are comments and ignored by the parser.
-
 ## Structure
 
 - A file consists of:
@@ -380,11 +376,12 @@ transition_interval=<float>
 - Sends raw SysEx bytes (space-separated hex, including `F0`/`F7` as needed).
 - Example: `12.0 sysex F0 7E 7F 09 01 F7`
 
-### comments
+### Comments
 ```
 // full-line comment
+<command> // inline comment
 ```
-- Lines beginning with `//` are ignored by the parser.
+- Everything after `//` is ignored by the parser (except for `://` in URLs).
 
 ## Transitions
 

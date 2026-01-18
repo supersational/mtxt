@@ -1,7 +1,7 @@
-use crate::types::record::MtxtRecord;
+use crate::types::record::{MtxtRecord, MtxtRecordLine};
 use std::collections::HashSet;
 
-pub fn transform(records: &[MtxtRecord], channels: &HashSet<u16>) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine], channels: &HashSet<u16>) -> Vec<MtxtRecordLine> {
     if channels.is_empty() {
         return records.to_vec();
     }
@@ -10,7 +10,7 @@ pub fn transform(records: &[MtxtRecord], channels: &HashSet<u16>) -> Vec<MtxtRec
 
     records
         .iter()
-        .filter(|record| match record {
+        .filter(|line| match &line.record {
             MtxtRecord::Note { channel, .. }
             | MtxtRecord::NoteOn { channel, .. }
             | MtxtRecord::NoteOff { channel, .. }
@@ -42,7 +42,7 @@ mod tests {
     use super::*;
     use crate::util::assert_eq_records;
 
-    fn include_channels_3_5(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
+    fn include_channels_3_5(records: &[MtxtRecordLine]) -> Vec<MtxtRecordLine> {
         transform(records, &HashSet::from([3, 5]))
     }
 

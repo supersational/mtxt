@@ -1,18 +1,19 @@
 use crate::transforms::apply;
-use crate::types::record::MtxtRecord;
+use crate::types::record::{MtxtRecord, MtxtRecordLine};
 
 /// Extracts common inline parameters into global directives.
 fn extract_property<T: PartialEq + Clone + Copy + std::fmt::Debug>(
-    records: Vec<MtxtRecord>,
+    records: Vec<MtxtRecordLine>,
     get_fn: impl Fn(&MtxtRecord) -> Option<T>,
     create_directive_fn: impl Fn(T) -> MtxtRecord,
     remove_fn: impl Fn(&mut MtxtRecord),
-) -> Vec<MtxtRecord> {
+) -> Vec<MtxtRecordLine> {
     let mut result = Vec::new();
     let mut current_global_value: Option<T> = None;
     let mut i = 0;
     while i < records.len() {
-        let rec = &records[i];
+        let line = &records[i];
+        let rec = &line.record;
 
         // Check if current record has the property explicitly set
         if let Some(val) = get_fn(rec) {
@@ -21,9 +22,9 @@ fn extract_property<T: PartialEq + Clone + Copy + std::fmt::Debug>(
                 && val == global
             {
                 // Matches global, just remove inline property
-                let mut new_rec = rec.clone();
-                remove_fn(&mut new_rec);
-                result.push(new_rec);
+                let mut new_line = line.clone();
+                remove_fn(&mut new_line.record);
+                result.push(new_line);
                 i += 1;
                 continue;
             }
@@ -33,7 +34,8 @@ fn extract_property<T: PartialEq + Clone + Copy + std::fmt::Debug>(
             let mut j = i + 1;
 
             while j < records.len() {
-                let next_rec = &records[j];
+                let next_line = &records[j];
+                let next_rec = &next_line.record;
 
                 if let Some(next_val) = get_fn(next_rec) {
                     if next_val == val {
@@ -50,33 +52,33 @@ fn extract_property<T: PartialEq + Clone + Copy + std::fmt::Debug>(
 
             if run_indices.len() >= 3 {
                 // Found a run of at least 3
-                result.push(create_directive_fn(val));
+                result.push(MtxtRecordLine::new(create_directive_fn(val)));
                 current_global_value = Some(val);
 
                 // Process the block from i to j
                 for k in i..j {
-                    let mut r = records[k].clone();
+                    let mut r_line = records[k].clone();
                     if run_indices.contains(&k) {
-                        remove_fn(&mut r);
+                        remove_fn(&mut r_line.record);
                     }
-                    result.push(r);
+                    result.push(r_line);
                 }
                 i = j;
             } else {
                 // Not enough for a run, just push the current record
-                result.push(rec.clone());
+                result.push(line.clone());
                 i += 1;
             }
         } else {
             // No explicit property, just push
-            result.push(rec.clone());
+            result.push(line.clone());
             i += 1;
         }
     }
     result
 }
 
-pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine]) -> Vec<MtxtRecordLine> {
     // Step 1: Apply all directives to make everything inline
     // This removes all existing directives and propagates their values to the events
     let mut current = apply::transform(records);

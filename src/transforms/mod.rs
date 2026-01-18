@@ -8,7 +8,7 @@ pub mod quantize;
 pub mod sort;
 pub mod transpose;
 
-use crate::MtxtRecord;
+use crate::types::record::MtxtRecordLine;
 use std::collections::HashSet;
 
 pub struct TransformDescriptor {
@@ -26,9 +26,9 @@ pub struct TransformDescriptor {
 }
 
 pub fn apply_transforms(
-    records: &[MtxtRecord],
+    records: &[MtxtRecordLine],
     transforms: &TransformDescriptor,
-) -> Vec<MtxtRecord> {
+) -> Vec<MtxtRecordLine> {
     let mut current_records = records.to_vec();
 
     // order is important here
