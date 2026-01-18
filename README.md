@@ -417,4 +417,4 @@ Notes:
 
 Copyright © 2025 Dani Biró
 
-Licensed under the MIT License.
+MTXT specification and reference implementation are dual-licensed under the Apache-2.0 license or the MIT license, at your option.
