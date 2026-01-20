@@ -109,6 +109,12 @@ fn main() -> Result<()> {
                 .action(clap::ArgAction::SetTrue),
         )
         .arg(
+            Arg::new("group-channels")
+                .help("Group events by channel")
+                .long("group-channels")
+                .action(clap::ArgAction::SetTrue),
+        )
+        .arg(
             Arg::new("merge-notes")
                 .help("Merge note on / off pairs into note shorthand events with durations")
                 .long("merge-notes")
@@ -136,6 +142,12 @@ fn main() -> Result<()> {
                 .value_name("AMOUNT")
                 .value_parser(clap::value_parser!(f32)),
         )
+        .arg(
+            Arg::new("indent")
+                .help("Enable timestamp padding")
+                .long("indent")
+                .action(clap::ArgAction::SetTrue),
+        )
         .get_matches();
 
     let input_file = matches.get_one::<String>("input").unwrap();
@@ -145,12 +157,14 @@ fn main() -> Result<()> {
     let sort_by_time = matches.get_flag("sort");
     let merge_notes = matches.get_flag("merge-notes");
     let extract_directives = matches.get_flag("extract-directives");
+    let group_channels = matches.get_flag("group-channels");
 
     let transpose_amount = matches.get_one::<i32>("transpose").copied().unwrap_or(0);
     let offset_amount = matches.get_one::<f32>("offset").copied().unwrap_or(0.0);
     let quantize_grid = matches.get_one::<u32>("quantize").copied().unwrap_or(0);
     let quantize_swing = matches.get_one::<f32>("swing").copied().unwrap_or(0.0);
     let quantize_humanize = matches.get_one::<f32>("humanize").copied().unwrap_or(0.0);
+    let indent = matches.get_flag("indent");
 
     let include_channels: std::collections::HashSet<u16> = matches
         .get_many::<u16>("include-channels")
@@ -176,6 +190,7 @@ fn main() -> Result<()> {
         offset_amount,
         include_channels,
         exclude_channels,
+        group_channels,
     };
 
     let input_format = detect_file_format(input_file)
@@ -198,8 +213,9 @@ fn main() -> Result<()> {
                 if verbose {
                     println!("Reading MIDI file: {}", input_file);
                 }
-                midi::convert_midi_to_mtxt(input_file, verbose)
-                    .context("Failed to convert MIDI to MTXT")?
+                let midi_bytes = std::fs::read(input_file)
+                    .with_context(|| format!("Failed to read MIDI file: {}", input_file))?;
+                midi::convert_midi_to_mtxt(&midi_bytes).context("Failed to convert MIDI to MTXT")?
             }
             #[cfg(not(feature = "midi"))]
             {
@@ -229,8 +245,10 @@ fn main() -> Result<()> {
                 if verbose {
                     println!("Writing MIDI file: {}", output_file);
                 }
-                midi::convert_mtxt_to_midi(&mtxt_file, output_file, verbose)
+                let midi_bytes = midi::convert_mtxt_to_midi(&mtxt_file)
                     .context("Failed to convert MTXT to MIDI")?;
+                std::fs::write(output_file, midi_bytes)
+                    .with_context(|| format!("Failed to write MIDI file: {}", output_file))?;
             }
             #[cfg(not(feature = "midi"))]
             {
@@ -241,7 +259,12 @@ fn main() -> Result<()> {
             if verbose {
                 println!("Writing MTXT file: {}", output_file);
             }
-            let output_content = format!("{}", mtxt_file);
+            let timestamp_width = if indent {
+                Some(mtxt_file.calculate_auto_timestamp_width())
+            } else {
+                None
+            };
+            let output_content = format!("{}", mtxt_file.display_with_formatting(timestamp_width));
             std::fs::write(output_file, output_content)
                 .with_context(|| format!("Failed to write output file: {}", output_file))?;
         }

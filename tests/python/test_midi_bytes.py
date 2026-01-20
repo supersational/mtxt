@@ -211,8 +211,8 @@ def test_bytes_large_file():
     print(f"✓ Large file (100 notes) → {len(midi_bytes)} bytes → {len(file2)} records")
 
 
-def test_bytes_verbose():
-    """Test verbose parameter controls println output (consistent with file-based API)"""
+def test_bytes_basic_api():
+    """Test that bytes API works without verbose parameter (simplified in v0.9)"""
     import mtxt
 
     content = """mtxt 1.0
@@ -222,26 +222,15 @@ def test_bytes_verbose():
 
     file = mtxt.parse(content)
 
-    # Test that both verbose=True and verbose=False work without error
-    # Note: Rust println! goes to process stdout, not Python sys.stdout,
-    # so we can't capture it with StringIO. But we verify the parameter works.
+    # Test to_midi_bytes works
+    midi_bytes = file.to_midi_bytes()
+    assert len(midi_bytes) > 0, "should produce bytes"
 
-    midi_bytes_silent = file.to_midi_bytes(verbose=False)
-    assert len(midi_bytes_silent) > 0, "verbose=False should produce bytes"
-
-    midi_bytes_verbose = file.to_midi_bytes(verbose=True)
-    assert len(midi_bytes_verbose) > 0, "verbose=True should produce bytes"
-
-    # Both should produce identical output
-    assert midi_bytes_silent == midi_bytes_verbose, "verbose should not affect output"
-
-    file2 = mtxt.MtxtFile.from_midi_bytes(midi_bytes_silent, verbose=False)
+    # Test from_midi_bytes works
+    file2 = mtxt.MtxtFile.from_midi_bytes(midi_bytes)
     assert file2.version is not None
 
-    file3 = mtxt.MtxtFile.from_midi_bytes(midi_bytes_verbose, verbose=True)
-    assert file3.version is not None
-
-    print(f"✓ verbose parameter works (prints to Rust stdout when True)")
+    print(f"✓ bytes API works (verbose removed in v0.9)")
 
 
 def test_bytes_api_exists():

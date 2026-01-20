@@ -366,8 +366,8 @@ def test_invalid_midi_conversion():
         file.to_midi("/root/impossible/path/file.mid")
         assert False, "Should have raised error"
     except Exception as e:
-        # Should be ConversionError or IOError
-        assert "ConversionError" in type(e).__name__ or "IOError" in type(e).__name__
+        # Should be ConversionError, IOError, or OSError
+        assert "ConversionError" in type(e).__name__ or "IOError" in type(e).__name__ or "OSError" in type(e).__name__
         print(f"✓ Invalid MIDI path handled: {type(e).__name__}")
 
 

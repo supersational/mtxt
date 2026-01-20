@@ -1,5 +1,5 @@
 use crate::types::note::NoteTarget;
-use crate::types::record::MtxtRecord;
+use crate::types::record::{MtxtRecord, MtxtRecordLine};
 use std::collections::HashMap;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
@@ -19,13 +19,15 @@ fn get_key(target: &NoteTarget) -> NoteKey {
     }
 }
 
-pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine]) -> Vec<MtxtRecordLine> {
     let mut new_records = Vec::new();
     // Key: (effective_channel, note_key) -> index in new_records
     let mut pending: HashMap<(u16, NoteKey), usize> = HashMap::new();
     let mut current_channel: u16 = 0;
 
-    for record in records {
+    for line in records {
+        let record = &line.record;
+
         // Track channel directives
         if let MtxtRecord::ChannelDirective { channel } = record {
             current_channel = *channel;
@@ -47,7 +49,7 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 // Better strategy: overwrite pending with new index.
                 let idx = new_records.len();
                 pending.insert((eff_ch, key), idx);
-                new_records.push(record.clone());
+                new_records.push(line.clone());
             }
             MtxtRecord::NoteOff {
                 time: off_time,
@@ -59,32 +61,39 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 let key = get_key(note);
 
                 if let Some(idx) = pending.remove(&(eff_ch, key)) {
-                    if let Some(MtxtRecord::NoteOn {
-                        time: on_time,
-                        note: _,
-                        velocity,
-                        channel: on_channel,
-                    }) = new_records.get(idx)
+                    if let Some(MtxtRecordLine {
+                        record:
+                            MtxtRecord::NoteOn {
+                                time: on_time,
+                                note: _,
+                                velocity,
+                                channel: on_channel,
+                            },
+                        comment: on_comment,
+                    }) = new_records.get(idx).cloned()
                     {
-                        let duration = *off_time - *on_time;
+                        let duration = *off_time - on_time;
                         // Create merged Note
                         let new_note = MtxtRecord::Note {
-                            time: *on_time,
+                            time: on_time,
                             note: note.clone(),
                             duration: Some(duration),
-                            velocity: *velocity,
+                            velocity,
                             off_velocity: *off_velocity,
-                            channel: *on_channel,
+                            channel: on_channel,
                         };
-                        new_records[idx] = new_note;
+                        new_records[idx] = MtxtRecordLine {
+                            record: new_note,
+                            comment: on_comment,
+                        };
                     }
                 } else {
                     // Unmatched NoteOff
-                    new_records.push(record.clone());
+                    new_records.push(line.clone());
                 }
             }
             _ => {
-                new_records.push(record.clone());
+                new_records.push(line.clone());
             }
         }
     }

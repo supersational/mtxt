@@ -10,8 +10,6 @@ use crate::parser::parse_mtxt as rust_parse_mtxt;
 use crate::midi::{
     convert_midi_to_mtxt as rust_convert_midi_to_mtxt,
     convert_mtxt_to_midi as rust_convert_mtxt_to_midi,
-    convert_midi_bytes_to_mtxt as rust_convert_midi_bytes_to_mtxt,
-    convert_mtxt_to_midi_bytes as rust_convert_mtxt_to_midi_bytes,
 };
 
 pyo3::create_exception!(mtxt, ParseError, PyValueError);
@@ -52,7 +50,12 @@ impl PyMtxtFile {
     #[staticmethod]
     #[pyo3(signature = (path, verbose=false))]
     fn from_midi(path: &str, verbose: bool) -> PyResult<Self> {
-        match rust_convert_midi_to_mtxt(path, verbose) {
+        let data = std::fs::read(path)
+            .map_err(|e| PyIOError::new_err(format!("Failed to read MIDI file '{}': {}", path, e)))?;
+        if verbose {
+            println!("Read {} bytes from {}", data.len(), path);
+        }
+        match rust_convert_midi_to_mtxt(&data) {
             Ok(file) => Ok(PyMtxtFile { inner: file }),
             Err(e) => Err(ConversionError::new_err(format!("Failed to convert MIDI: {}", e))),
         }
@@ -61,16 +64,21 @@ impl PyMtxtFile {
     #[cfg(feature = "midi")]
     #[pyo3(signature = (path, verbose=false))]
     fn to_midi(&self, path: &str, verbose: bool) -> PyResult<()> {
-        match rust_convert_mtxt_to_midi(&self.inner, path, verbose) {
-            Ok(_) => Ok(()),
+        match rust_convert_mtxt_to_midi(&self.inner) {
+            Ok(bytes) => {
+                if verbose {
+                    println!("Writing {} bytes to {}", bytes.len(), path);
+                }
+                std::fs::write(path, bytes)
+                    .map_err(|e| PyIOError::new_err(format!("Failed to write MIDI file '{}': {}", path, e)))
+            },
             Err(e) => Err(ConversionError::new_err(format!("Failed to convert to MIDI: {}", e))),
         }
     }
 
     #[cfg(feature = "midi")]
-    #[pyo3(signature = (verbose=false))]
-    fn to_midi_bytes(&self, verbose: bool) -> PyResult<Vec<u8>> {
-        match rust_convert_mtxt_to_midi_bytes(&self.inner, verbose) {
+    fn to_midi_bytes(&self) -> PyResult<Vec<u8>> {
+        match rust_convert_mtxt_to_midi(&self.inner) {
             Ok(bytes) => Ok(bytes),
             Err(e) => Err(ConversionError::new_err(format!("Failed to convert to MIDI bytes: {}", e))),
         }
@@ -78,9 +86,8 @@ impl PyMtxtFile {
 
     #[cfg(feature = "midi")]
     #[staticmethod]
-    #[pyo3(signature = (data, verbose=false))]
-    fn from_midi_bytes(data: &[u8], verbose: bool) -> PyResult<PyMtxtFile> {
-        match rust_convert_midi_bytes_to_mtxt(data, verbose) {
+    fn from_midi_bytes(data: &[u8]) -> PyResult<PyMtxtFile> {
+        match rust_convert_midi_to_mtxt(data) {
             Ok(file) => Ok(PyMtxtFile { inner: file }),
             Err(e) => Err(ConversionError::new_err(format!("Failed to parse MIDI bytes: {}", e))),
         }
@@ -172,9 +179,8 @@ fn midi_to_mtxt(midi_path: &str, verbose: bool) -> PyResult<PyMtxtFile> {
 ///     file = mtxt.from_midi_bytes(midi_data)
 #[cfg(feature = "midi")]
 #[pyfunction]
-#[pyo3(signature = (data, verbose=false))]
-fn from_midi_bytes(data: &[u8], verbose: bool) -> PyResult<PyMtxtFile> {
-    PyMtxtFile::from_midi_bytes(data, verbose)
+fn from_midi_bytes(data: &[u8]) -> PyResult<PyMtxtFile> {
+    PyMtxtFile::from_midi_bytes(data)
 }
 
 /// Convert MTXT to MIDI

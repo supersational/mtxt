@@ -148,9 +148,30 @@ pub enum MtxtRecord {
 
     // Formatting events for passthrough conversion
     EmptyLine,
-    Comment {
-        text: String,
-    },
+}
+
+/// A line in an MTXT file, containing a record and an optional inline comment.
+/// This enables round-trip preservation of inline comments (e.g., `0.0 note C4 // melody start`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct MtxtRecordLine {
+    pub record: MtxtRecord,
+    pub comment: Option<String>,
+}
+
+impl MtxtRecordLine {
+    pub fn new(record: MtxtRecord) -> Self {
+        Self {
+            record,
+            comment: None,
+        }
+    }
+
+    pub fn with_comment(record: MtxtRecord, comment: String) -> Self {
+        Self {
+            record,
+            comment: Some(comment),
+        }
+    }
 }
 
 impl fmt::Display for MtxtRecord {
@@ -181,9 +202,12 @@ impl fmt::Display for MtxtRecord {
                 write!(f, "transition_interval={}", format_float32(*interval))
             }
             MtxtRecord::AliasDef { value } => {
-                write!(f, "alias {}", value.name)?;
-                for note in &value.notes {
-                    write!(f, " {}", note)?;
+                write!(f, "alias {} ", value.name)?;
+                for (i, note) in value.notes.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, ",")?;
+                    }
+                    write!(f, "{}", note)?;
                 }
                 Ok(())
             }
@@ -342,9 +366,6 @@ impl fmt::Display for MtxtRecord {
             }
             MtxtRecord::EmptyLine => {
                 write!(f, "")
-            }
-            MtxtRecord::Comment { text, .. } => {
-                write!(f, "// {}", text)
             }
         }
     }

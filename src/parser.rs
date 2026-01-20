@@ -22,20 +22,18 @@ impl MtxtParser {
     }
 
     pub fn parse(&mut self, content: &str) -> Result<MtxtFile> {
-        let lines: Vec<&str> = content.lines().collect();
         let mut mtxt_file = MtxtFile::new();
 
         let mut has_mtxt_header = false;
 
-        for (line_idx, line) in lines.iter().enumerate() {
-            let line = line.trim();
+        for (line_idx, line) in content.lines().enumerate() {
             let parsed = parse_mtxt_line(line);
             match parsed {
-                Ok(record) => {
-                    if matches!(record, MtxtRecord::Header { version: _ }) {
+                Ok(record_line) => {
+                    if matches!(record_line.record, MtxtRecord::Header { version: _ }) {
                         has_mtxt_header = true;
                     }
-                    mtxt_file.records.push(record);
+                    mtxt_file.records.push(record_line);
                 }
                 Err(e) => bail!("Line #{}: {}", line_idx + 1, e),
             }

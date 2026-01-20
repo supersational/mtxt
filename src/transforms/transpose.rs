@@ -1,5 +1,5 @@
 use crate::types::note::{Note, NoteTarget};
-use crate::types::record::{AliasDefinition, MtxtRecord};
+use crate::types::record::{AliasDefinition, MtxtRecord, MtxtRecordLine};
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -24,7 +24,7 @@ fn transpose_target(
     }
 }
 
-pub fn transform(records: &[MtxtRecord], amount: i32) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine], amount: i32) -> Vec<MtxtRecordLine> {
     if amount == 0 {
         return records.to_vec();
     }
@@ -32,7 +32,8 @@ pub fn transform(records: &[MtxtRecord], amount: i32) -> Vec<MtxtRecord> {
     let mut new_records = Vec::with_capacity(records.len());
     let mut alias_map: HashMap<usize, Rc<AliasDefinition>> = HashMap::new();
 
-    for record in records {
+    for line in records {
+        let record = &line.record;
         let new_record = match record {
             MtxtRecord::AliasDef { value } => {
                 let new_notes: Vec<Note> =
@@ -104,7 +105,10 @@ pub fn transform(records: &[MtxtRecord], amount: i32) -> Vec<MtxtRecord> {
             },
             _ => record.clone(),
         };
-        new_records.push(new_record);
+        new_records.push(MtxtRecordLine {
+            record: new_record,
+            comment: line.comment.clone(),
+        });
     }
     new_records
 }

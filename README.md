@@ -48,9 +48,13 @@ maturin develop --features python,midi
 pytest tests/python/
 ```
 
+For more details on the MTXT format specification and CLI options, see the [main MTXT repository](https://github.com/Daninet/mtxt).
+
+
 ## License
 
 Original MTXT library: Copyright © 2025 Dani Biró
 Python bindings: Copyright © 2026 Sven Hollowell
 
-Licensed under the MIT License.
+MTXT specification and reference implementation are dual-licensed under the Apache-2.0 license or the MIT license, at your option.
+

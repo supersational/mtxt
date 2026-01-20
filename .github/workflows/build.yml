@@ -22,7 +22,7 @@ jobs:
             target: x86_64-pc-windows-msvc
             platform_name: Windows x64
             binary_name: mtxt.exe
-            asset_name: mtxt-win-x64
+            asset_name: mtxt-win-x64.exe
             use_cross: false
           - os: macos-14
             target: aarch64-apple-darwin

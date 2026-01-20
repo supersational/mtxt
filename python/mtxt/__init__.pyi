@@ -103,12 +103,9 @@ class MtxtFile:
         """
         ...
 
-    def to_midi_bytes(self, verbose: bool = False) -> bytes:
+    def to_midi_bytes(self) -> bytes:
         """
         Convert this MTXT file to MIDI format as bytes.
-
-        Args:
-            verbose: Whether to print conversion progress
 
         Returns:
             MIDI file content as bytes
@@ -126,13 +123,12 @@ class MtxtFile:
         ...
 
     @staticmethod
-    def from_midi_bytes(data: bytes, verbose: bool = False) -> MtxtFile:
+    def from_midi_bytes(data: bytes) -> MtxtFile:
         """
         Parse MIDI format from bytes.
 
         Args:
             data: MIDI file content as bytes
-            verbose: Whether to print conversion progress
 
         Returns:
             The converted MTXT file
@@ -283,13 +279,12 @@ def midi_to_mtxt(midi_path: str, verbose: bool = False) -> MtxtFile:
     """
     ...
 
-def from_midi_bytes(data: bytes, verbose: bool = False) -> MtxtFile:
+def from_midi_bytes(data: bytes) -> MtxtFile:
     """
     Parse MIDI format from bytes (module-level convenience function).
 
     Args:
         data: MIDI file content as bytes
-        verbose: Whether to print conversion progress
 
     Returns:
         The converted MTXT file

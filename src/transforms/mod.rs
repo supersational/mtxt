@@ -1,6 +1,7 @@
 pub mod apply;
 pub mod exclude;
 pub mod extract;
+pub mod group;
 pub mod include;
 pub mod merge;
 pub mod offset;
@@ -8,7 +9,7 @@ pub mod quantize;
 pub mod sort;
 pub mod transpose;
 
-use crate::MtxtRecord;
+use crate::types::record::MtxtRecordLine;
 use std::collections::HashSet;
 
 pub struct TransformDescriptor {
@@ -23,12 +24,13 @@ pub struct TransformDescriptor {
     pub offset_amount: f32,
     pub include_channels: HashSet<u16>,
     pub exclude_channels: HashSet<u16>,
+    pub group_channels: bool,
 }
 
 pub fn apply_transforms(
-    records: &[MtxtRecord],
+    records: &[MtxtRecordLine],
     transforms: &TransformDescriptor,
-) -> Vec<MtxtRecord> {
+) -> Vec<MtxtRecordLine> {
     let mut current_records = records.to_vec();
 
     // order is important here
@@ -68,6 +70,10 @@ pub fn apply_transforms(
 
     if transforms.sort_by_time {
         current_records = sort::transform(&current_records);
+    }
+
+    if transforms.group_channels {
+        current_records = group::transform(&current_records);
     }
 
     if transforms.extract_directives {
