@@ -22,19 +22,25 @@ file = mtxt.parse("""mtxt 1.0
 0 tempo 120
 0 note C4 dur=1 vel=0.8
 """)
+# Or using file I/O
+file = mtxt.load("song.mtxt")
+file.save("output.mtxt")
+
 
 # Access properties
 print(file.version)           # "1.0"
 print(file.duration)          # 0.0 (beats)
 print(file.get_meta("title")) # metadata
 
-# File I/O
-file = mtxt.load("song.mtxt")
-file.save("output.mtxt")
 
 # MIDI conversion
 file.to_midi("output.mid")
-file2 = mtxt.MtxtFile.from_midi("input.mid")
+file_from_midi = mtxt.MtxtFile.from_midi("output.mid")
+
+# Print as mtxt string
+print(file_from_midi)
+# Prints: MtxtFile(version=Some("1.0"), records=3, duration=Some(0.0))
+print(repr(file_from_midi))
 ```
 
 
