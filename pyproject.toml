@@ -28,8 +28,8 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/supersational/mtxt/tree/python-lib"
-Repository = "https://github.com/supersational/mtxt/tree/python-lib"
+Homepage = "https://github.com/supersational/mtxt"
+Repository = "https://github.com/supersational/mtxt"
 
 [tool.maturin]
 features = ["pyo3", "midi"]
