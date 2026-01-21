@@ -1,15 +1,20 @@
-use crate::types::record::MtxtRecord;
+use crate::types::record::{MtxtRecord, MtxtRecordLine};
 
-pub fn transform(records: &[MtxtRecord], grid: u32, swing: f32, humanize: f32) -> Vec<MtxtRecord> {
+pub fn transform(
+    records: &[MtxtRecordLine],
+    grid: u32,
+    swing: f32,
+    humanize: f32,
+) -> Vec<MtxtRecordLine> {
     if grid == 0 {
         return records.to_vec();
     }
 
     records
         .iter()
-        .map(|record| {
-            let mut new_record = record.clone();
-            match &mut new_record {
+        .map(|line| {
+            let mut new_line = line.clone();
+            match &mut new_line.record {
                 MtxtRecord::Note { time, .. }
                 | MtxtRecord::NoteOn { time, .. }
                 | MtxtRecord::NoteOff { time, .. }
@@ -29,7 +34,7 @@ pub fn transform(records: &[MtxtRecord], grid: u32, swing: f32, humanize: f32) -
                 }
                 _ => {}
             }
-            new_record
+            new_line
         })
         .collect()
 }
@@ -55,19 +60,4 @@ mtxt 1.0
 "#;
         assert_eq_records(input, |r| transform(r, 4, 0.0, 0.0), expected);
     }
-
-    //     #[test]
-    //     fn test_quantize_swing() {
-    //         let input = r#"
-    // mtxt 1.0
-    // 1.0 note C4
-    // 1.3 note E4
-    // "#;
-    //         let expected = r#"
-    // mtxt 1.0
-    // 1.0 note C4
-    // 1.541674 note E4
-    // "#;
-    //         assert_eq_records(input, |r| transform(r, 2, 0.5, 0.0), expected);
-    //     }
 }

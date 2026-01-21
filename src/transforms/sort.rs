@@ -1,33 +1,33 @@
-use crate::types::record::MtxtRecord;
+use crate::types::record::MtxtRecordLine;
 use std::cmp::Ordering;
 
-pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine]) -> Vec<MtxtRecordLine> {
     let mut new_records = Vec::with_capacity(records.len());
-    let mut buffer: Vec<MtxtRecord> = Vec::new();
+    let mut buffer: Vec<MtxtRecordLine> = Vec::new();
 
-    for record in records {
-        if record.time().is_some() {
-            buffer.push(record.clone());
+    for line in records {
+        if line.record.time().is_some() {
+            buffer.push(line.clone());
         } else {
             // Barrier encountered: sort and flush buffer
             if !buffer.is_empty() {
                 buffer.sort_by(|a, b| {
-                    let ta = a.time().unwrap();
-                    let tb = b.time().unwrap();
+                    let ta = a.record.time().unwrap();
+                    let tb = b.record.time().unwrap();
                     ta.partial_cmp(&tb).unwrap_or(Ordering::Equal)
                 });
                 new_records.append(&mut buffer);
             }
             // Push the barrier record
-            new_records.push(record.clone());
+            new_records.push(line.clone());
         }
     }
 
     // Flush remaining buffer
     if !buffer.is_empty() {
         buffer.sort_by(|a, b| {
-            let ta = a.time().unwrap();
-            let tb = b.time().unwrap();
+            let ta = a.record.time().unwrap();
+            let tb = b.record.time().unwrap();
             ta.partial_cmp(&tb).unwrap_or(Ordering::Equal)
         });
         new_records.append(&mut buffer);

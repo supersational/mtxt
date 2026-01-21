@@ -3,7 +3,6 @@ use crate::types::output_record::MtxtOutputRecord;
 use crate::types::record::VoiceList;
 use anyhow::{Result, bail};
 use midly::{MetaMessage, MidiMessage, Smf, Timing, TrackEvent, TrackEventKind};
-use std::path::PathBuf;
 
 use super::escape::unescape_string;
 use super::instruments::INSTRUMENTS;
@@ -11,9 +10,18 @@ use super::shared::{
     MidiControllerEvent, controller_name_to_midi, note_to_midi_number, time_signature_to_midi,
 };
 
-pub fn convert_mtxt_to_midi(mtxt_file: &MtxtFile, output: &str, verbose: bool) -> Result<()> {
-    let output_path = PathBuf::from(output);
+pub fn convert_mtxt_to_midi(mtxt_file: &MtxtFile) -> Result<Vec<u8>> {
+    let mut output_records = mtxt_file.get_output_records();
+    let smf = convert_output_records_to_midi(&mut output_records)?;
 
+    let mut buffer = Vec::new();
+    smf.write(&mut buffer)
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+    Ok(buffer)
+}
+
+pub fn convert_mtxt_to_midi_bytes(mtxt_file: &MtxtFile, verbose: bool) -> Result<Vec<u8>> {
     if verbose {
         println!("Converting to MIDI...");
     }
@@ -27,16 +35,17 @@ pub fn convert_mtxt_to_midi(mtxt_file: &MtxtFile, output: &str, verbose: bool) -
     let smf = convert_output_records_to_midi(&mut output_records)?;
 
     if verbose {
-        println!("Writing MIDI file: {}", output_path.display());
+        println!("Writing MIDI to bytes...");
     }
 
-    smf.save(&output_path)?;
+    let mut buffer = Vec::new();
+    smf.write(&mut buffer).map_err(|e| anyhow::anyhow!("Failed to write MIDI: {}", e))?;
 
     if verbose {
-        println!("Conversion completed successfully!");
+        println!("Conversion completed successfully! ({} bytes)", buffer.len());
     }
 
-    Ok(())
+    Ok(buffer)
 }
 
 fn voice_to_program_change(voice: &VoiceList) -> u8 {

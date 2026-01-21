@@ -1,6 +1,6 @@
 use crate::MtxtFile;
-use crate::MtxtRecord;
 use crate::parse_mtxt;
+use crate::types::record::MtxtRecordLine;
 
 pub fn format_float32(value: f32) -> String {
     let trimmed_zeros = format!("{:.5}", value).trim_end_matches('0').to_string();
@@ -14,7 +14,7 @@ pub fn format_float32(value: f32) -> String {
 
 pub fn assert_eq_records(
     input: &str,
-    transform: fn(&[MtxtRecord]) -> Vec<MtxtRecord>,
+    transform: fn(&[MtxtRecordLine]) -> Vec<MtxtRecordLine>,
     expected: &str,
 ) {
     let input_parsed = parse_mtxt(input).expect("Failed to parse input");

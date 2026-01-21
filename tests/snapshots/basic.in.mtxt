@@ -10,7 +10,7 @@ meta global composer Test Composer
 meta global trackname Test Track
 meta global instrument Test Instrument
 meta global text Test text metadata
-meta global lyric Test lyrics
+meta global lyric Test lyrics//inline comment
 meta global marker Start Marker
 meta global cue Test Cue
 meta global program Test Program
@@ -53,7 +53,7 @@ alias Dmin7 D4,F4,A4,C5
 0.0 voice piano, acoustic grand
 
 // Basic notes
-0.0 note C4
+0.0 note C4 // melody start
 1.0 note D4 vel=0.9
 2.0 note E4 dur=2.0
 

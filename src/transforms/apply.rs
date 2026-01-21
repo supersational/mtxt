@@ -1,5 +1,5 @@
 use crate::BeatTime;
-use crate::types::record::MtxtRecord;
+use crate::types::record::{MtxtRecord, MtxtRecordLine};
 
 struct State {
     channel: Option<u16>,
@@ -23,11 +23,12 @@ impl State {
     }
 }
 
-pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
+pub fn transform(records: &[MtxtRecordLine]) -> Vec<MtxtRecordLine> {
     let mut state = State::new();
     let mut new_records = Vec::with_capacity(records.len());
 
-    for record in records {
+    for line in records {
+        let record = &line.record;
         match record {
             MtxtRecord::ChannelDirective { channel } => {
                 state.channel = Some(*channel);
@@ -56,13 +57,16 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 off_velocity,
                 channel,
             } => {
-                new_records.push(MtxtRecord::Note {
-                    time: *time,
-                    note: note.clone(),
-                    duration: duration.or(state.duration),
-                    velocity: velocity.or(state.velocity),
-                    off_velocity: off_velocity.or(state.off_velocity),
-                    channel: channel.or(state.channel),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::Note {
+                        time: *time,
+                        note: note.clone(),
+                        duration: duration.or(state.duration),
+                        velocity: velocity.or(state.velocity),
+                        off_velocity: off_velocity.or(state.off_velocity),
+                        channel: channel.or(state.channel),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             MtxtRecord::NoteOn {
@@ -71,11 +75,14 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 velocity,
                 channel,
             } => {
-                new_records.push(MtxtRecord::NoteOn {
-                    time: *time,
-                    note: note.clone(),
-                    velocity: velocity.or(state.velocity),
-                    channel: channel.or(state.channel),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::NoteOn {
+                        time: *time,
+                        note: note.clone(),
+                        velocity: velocity.or(state.velocity),
+                        channel: channel.or(state.channel),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             MtxtRecord::NoteOff {
@@ -84,11 +91,14 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 off_velocity,
                 channel,
             } => {
-                new_records.push(MtxtRecord::NoteOff {
-                    time: *time,
-                    note: note.clone(),
-                    off_velocity: off_velocity.or(state.off_velocity),
-                    channel: channel.or(state.channel),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::NoteOff {
+                        time: *time,
+                        note: note.clone(),
+                        off_velocity: off_velocity.or(state.off_velocity),
+                        channel: channel.or(state.channel),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             MtxtRecord::ControlChange {
@@ -101,15 +111,18 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 transition_time,
                 transition_interval,
             } => {
-                new_records.push(MtxtRecord::ControlChange {
-                    time: *time,
-                    note: note.clone(),
-                    controller: controller.clone(),
-                    value: *value,
-                    channel: *channel,
-                    transition_curve: transition_curve.or(state.transition_curve),
-                    transition_time: *transition_time,
-                    transition_interval: transition_interval.or(state.transition_interval),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::ControlChange {
+                        time: *time,
+                        note: note.clone(),
+                        controller: controller.clone(),
+                        value: *value,
+                        channel: *channel,
+                        transition_curve: transition_curve.or(state.transition_curve),
+                        transition_time: *transition_time,
+                        transition_interval: transition_interval.or(state.transition_interval),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             MtxtRecord::Voice {
@@ -117,10 +130,13 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 voices,
                 channel,
             } => {
-                new_records.push(MtxtRecord::Voice {
-                    time: *time,
-                    voices: voices.clone(),
-                    channel: channel.or(state.channel),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::Voice {
+                        time: *time,
+                        voices: voices.clone(),
+                        channel: channel.or(state.channel),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             MtxtRecord::Tempo {
@@ -130,16 +146,19 @@ pub fn transform(records: &[MtxtRecord]) -> Vec<MtxtRecord> {
                 transition_time,
                 transition_interval,
             } => {
-                new_records.push(MtxtRecord::Tempo {
-                    time: *time,
-                    bpm: *bpm,
-                    transition_curve: transition_curve.or(state.transition_curve),
-                    transition_time: *transition_time,
-                    transition_interval: transition_interval.or(state.transition_interval),
+                new_records.push(MtxtRecordLine {
+                    record: MtxtRecord::Tempo {
+                        time: *time,
+                        bpm: *bpm,
+                        transition_curve: transition_curve.or(state.transition_curve),
+                        transition_time: *transition_time,
+                        transition_interval: transition_interval.or(state.transition_interval),
+                    },
+                    comment: line.comment.clone(),
                 });
             }
             _ => {
-                new_records.push(record.clone());
+                new_records.push(line.clone());
             }
         }
     }

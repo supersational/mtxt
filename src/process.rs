@@ -359,8 +359,7 @@ fn create_intermediate_records(records: &[MtxtRecord]) -> Vec<IntermediateRecord
                 });
             }
 
-            MtxtRecord::Header { version: _ } => {}
-            MtxtRecord::EmptyLine | MtxtRecord::Comment { .. } => {}
+            MtxtRecord::Header { version: _ } | MtxtRecord::EmptyLine => {}
         }
     }
 
